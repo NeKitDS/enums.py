@@ -10,7 +10,7 @@ Example
 
 >>> from enums import Enum
 
->>> class Color(int, Enum):
+>>> class Color(Enum):
 ...     RED = 1
 ...     GREEN = 2
 ...     BLUE = 3
@@ -23,8 +23,13 @@ Example
 <Color.BLUE: 3>
 
 >>> Color.update(ALPHA=0)  # updating
->>> color = Color.from_name("alpha"); print(color.name, color.value, color.title)
-ALPHA 0 Alpha
+>>> color = Color.from_name("alpha")
+>>> print(color.name)
+ALPHA
+>>> print(color.value)
+0
+>>> print(color.title)
+Alpha
 
 MIT License
 
@@ -53,7 +58,7 @@ __title__ = "enums"
 __author__ = "NeKitDS"
 __copyright__ = "Copyright 2020 NeKitDS"
 __license__ = "MIT"
-__version__ = "0.1.1"
+__version__ = "0.1.2"
 
 import sys
 from types import DynamicClassAttribute as dynamic_attribute, FrameType, MappingProxyType
@@ -81,7 +86,9 @@ __all__ = (
     "EnumDict",
     "EnumMeta",
     "Enum",
+    "IntEnum",
     "Flag",
+    "IntFlag",
     "auto",
     "unique",
     "generate_next_value",
@@ -179,7 +186,6 @@ def _is_descriptor(some_object: Any) -> bool:
 
 
 def _find_data_type(bases: Tuple[Type[T], ...]) -> Type[T]:
-    # taken from standard library enum module
     for chain in bases:
         for base in chain.__mro__:
             if base is object:  # not useful in our case
@@ -279,9 +285,18 @@ def _create_enum_member(
         enum_class._member_map[member_name] = enum_member
 
     try:
+        # see if member with this value exists (we reach here with member_name=None)
+        previous_member = enum_class._value_map.get(value)
+
+        # see if member exists and has name set to None
+        if previous_member is not None and previous_member._name is None:
+            previous_member._name = enum_member._name  # if so, update name
+            enum_member = previous_member
+
         # attempt to add value to value -> member map in order to make lookups constant, O(1)
         # if value is not hashable, this will fail and our lookups will be linear, O(n)
         enum_class._value_map.setdefault(value, enum_member)  # in order to support threading
+
     except TypeError:  # not hashable
         pass
 
@@ -832,6 +847,10 @@ class Enum(metaclass=EnumMeta):
         return self._value
 
 
+class IntEnum(int, Enum):
+    """Generic enumeration for integer-based values."""
+
+
 USELESS_NEW.add(Enum.__new__)
 
 
@@ -852,12 +871,12 @@ def unique(enumeration: Type[Enum]) -> Type[Enum]:
 
 
 class Flag(Enum):
-    """Support for integer-based flags."""
+    """Support for bit flags."""
 
     generate_next_value = strict_bit_next_value
 
     @classmethod
-    def enum_missing(cls, value: int) -> Enum:
+    def enum_missing(cls, value: T) -> Enum:
         """Create composite members on missing enums."""
         original_value = value
 
@@ -872,7 +891,7 @@ class Flag(Enum):
         return possible_member
 
     @classmethod
-    def _create_composite_member(cls, value: int) -> Enum:
+    def _create_composite_member(cls, value: T) -> Enum:
         """Generate member composed of other members."""
         composite_member = cls._value_map.get(value)
 
@@ -948,7 +967,7 @@ class Flag(Enum):
     def __bool__(self) -> bool:
         return bool(self._value)
 
-    def __or__(self, other: Union[int, Enum]) -> Enum:
+    def __or__(self, other: Union[T, Enum]) -> Enum:
         cls = self.__class__
         try:
             other = cls(other)
@@ -956,7 +975,7 @@ class Flag(Enum):
             return NotImplemented
         return cls(self._value | other._value)
 
-    def __and__(self, other: Union[int, Enum]) -> Enum:
+    def __and__(self, other: Union[T, Enum]) -> Enum:
         cls = self.__class__
         try:
             other = cls(other)
@@ -964,7 +983,7 @@ class Flag(Enum):
             return NotImplemented
         return cls(self._value & other._value)
 
-    def __xor__(self, other: Union[int, Enum]) -> Enum:
+    def __xor__(self, other: Union[T, Enum]) -> Enum:
         cls = self.__class__
         try:
             other = cls(other)
@@ -986,6 +1005,45 @@ class Flag(Enum):
     __ior__ = __or__
     __iand__ = __and__
     __ixor__ = __xor__
+
+
+class IntFlag(int, Flag):
+    """Support for integer-based bit flags."""
+
+    @classmethod
+    def _create_composite_member(cls, value: int) -> Flag:
+        composite_member = cls._value_map.get(value)
+
+        if composite_member is None:
+            need_to_create = [value]
+
+            _, extra_flags = _decompose(cls, value)  # get unaccounted for bits
+
+            while extra_flags:
+
+                bit = _high_bit(extra_flags)
+                flag_value = 2 ** bit
+
+                if (flag_value not in cls._value_map and flag_value not in need_to_create):
+                    need_to_create.append(flag_value)
+
+                if extra_flags == -flag_value:
+                    extra_flags = 0
+                else:
+                    extra_flags ^= flag_value
+
+            for value in reversed(need_to_create):
+                composite_member = _create_enum_member(
+                    member_name=None,
+                    member_type=cls._member_type,
+                    value=value,
+                    enum_class=cls,
+                    new_function=cls._new_function,
+                    use_args=cls._use_args,
+                    dynamic_attributes=cls._dynamic_attributes,
+                )
+
+        return composite_member
 
 
 def _decompose(flag: Type[Flag], value: int) -> Tuple[List[Flag], int]:

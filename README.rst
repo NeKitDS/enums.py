@@ -38,7 +38,7 @@ Here are main classes that are used in enums:
 
 .. code-block:: python3
 
-    from enums import Enum, Flag, auto, unique
+    from enums import Enum, Flag, IntEnum, IntFlag, auto, unique
 
 Creating Enums
 --------------
@@ -188,7 +188,7 @@ Enum members can be restricted to have values of the same type:
 
 .. code-block:: python3
 
-    class OnlyInt(int, Enum):
+    class OnlyInt(IntEnum):
         SOME = 1
         OTHER = "2"  # will be casted
         BROKEN = "broken"  # error will be raised on creation
@@ -273,6 +273,13 @@ In order to install the library from source, you can do the following:
     $ git clone https://github.com/NeKitDS/enums.py
     $ cd enums.py
     $ python -m pip install -U .
+
+Changlelog
+----------
+
+- **0.1.0** - Initial release, almost full support of standard enum module;
+- **0.1.1** - Make bitwise operations in Flag smarter;
+- **0.1.2** - Add IntEnum and IntFlag.
 
 Authors
 -------
