@@ -923,10 +923,14 @@ class Flag(Enum):
         return other._value & self._value == other._value
 
     def __repr__(self) -> str:
-        return f"<{self.__class__.__name__}.{self.composite_name}: {self._value}>"
+        if self._name is None:
+            return f"<{self.__class__.__name__}.{self.composite_name}: {self._value}>"
+        return f"<{self.__class__.__name__}.{self._name}: {self._value}>"
 
     def __str__(self) -> str:
-        return f"{self.__class__.__name__}.{self.composite_name} ({self.title})"
+        if self._name is None:
+            return f"{self.__class__.__name__}.{self.composite_name} ({self.title})"
+        return f"{self.__class__.__name__}.{self._name} ({self.title})"
 
     @classmethod
     def from_args(cls, *args) -> Enum:

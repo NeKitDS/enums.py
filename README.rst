@@ -181,8 +181,8 @@ Integers can be used instead of enum members:
 
     READ_WRITE_EXECUTE = FileMode.NULL | 1 | 2 | 4
 
-Type Restriction
-----------------
+Type Restriction and Inheritance
+--------------------------------
 
 Enum members can be restricted to have values of the same type:
 
@@ -192,6 +192,19 @@ Enum members can be restricted to have values of the same type:
         SOME = 1
         OTHER = "2"  # will be casted
         BROKEN = "broken"  # error will be raised on creation
+
+As well as inherit behaviour from that type:
+
+.. code-block:: python3
+
+    class Access(IntFlag):
+        NULL = 0
+        SIMPLE = 1
+        MAIN = 2
+
+    FULL = Access.SIMPLE | Access.MAIN
+    assert FULL > Access.MAIN
+    print(FULL.bit_length())  # 2
 
 Unique Enums
 ------------
