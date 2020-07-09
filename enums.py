@@ -53,7 +53,7 @@ __title__ = "enums"
 __author__ = "NeKitDS"
 __copyright__ = "Copyright 2020 NeKitDS"
 __license__ = "MIT"
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 import sys
 from types import DynamicClassAttribute as dynamic_attribute, FrameType, MappingProxyType
@@ -950,25 +950,25 @@ class Flag(Enum):
 
     def __or__(self, other: Union[int, Enum]) -> Enum:
         cls = self.__class__
-        if isinstance(other, int):
+        try:
             other = cls(other)
-        if not isinstance(other, cls):
+        except Exception:  # noqa
             return NotImplemented
         return cls(self._value | other._value)
 
     def __and__(self, other: Union[int, Enum]) -> Enum:
         cls = self.__class__
-        if isinstance(other, int):
+        try:
             other = cls(other)
-        if not isinstance(other, cls):
+        except Exception:  # noqa
             return NotImplemented
         return cls(self._value & other._value)
 
     def __xor__(self, other: Union[int, Enum]) -> Enum:
         cls = self.__class__
-        if isinstance(other, int):
+        try:
             other = cls(other)
-        if not isinstance(other, cls):
+        except Exception:  # noqa
             return NotImplemented
         return cls(self._value ^ other._value)
 
