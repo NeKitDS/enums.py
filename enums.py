@@ -98,24 +98,6 @@ __all__ = (
 
 DEFAULT_DOCUMENTATION = "An enumeration."
 DESCRIPTOR_ATTRIBUTES = ("__get__", "__set__", "__delete__")  # attributes that define a descriptor
-ENSURE_ENUM_MEMBERS = (
-    # ENUMS
-    "__repr__",
-    "__str__",
-    "__format__",
-    "__reduce_ex__",
-    # FLAGS
-    "__or__",
-    "__ror__",
-    "__ior__",
-    "__and__",
-    "__rand__",
-    "__iand__",
-    "__xor__",
-    "__rxor__",
-    "__ixor__",
-    "__invert__",
-)
 ENUM_DEFINITION = "EnumName([mixin_type, ...] [data_type] enum_type)"  # enum subclass definition
 INVALID_ENUM_NAMES = {"mro", ""}  # any others?
 OBJECT_NEW = object.__new__  # default new function used to create enum valuess
@@ -458,6 +440,17 @@ class EnumMeta(type):
         # add default documentation if we need to
         cls_dict.setdefault("__doc__", DEFAULT_DOCUMENTATION)
 
+        base_list = list(bases)  # convert tuple to list in order to do manipulations
+
+        try:  # try to remove member type from the list
+            base_list.remove(member_type)
+        except ValueError:  # not in base_list
+            pass
+
+        base_list.append(member_type)  # and add it and the end
+
+        bases = tuple(base_list)  # now back to tuple
+
         # create our new class
         enum_class = super().__new__(meta_cls, cls, bases, cls_dict)
 
@@ -492,15 +485,6 @@ class EnumMeta(type):
                 use_args=new_use_args,
                 dynamic_attributes=dynamic_attributes,
             )
-
-        # double check that repr, str, format and reduce_ex are ours
-        for name in ENSURE_ENUM_MEMBERS:
-            class_method = getattr(enum_class, name, None)
-            object_method = getattr(member_type, name, None)
-            enum_method = getattr(enum_type, name, None)
-
-            if object_method is not None and object_method is class_method:
-                setattr(enum_class, name, enum_method)
 
         if Enum is not None:  # if enum was created (this will be false on initial run)
             if new_member_save:  # save as new_member if needed
@@ -541,7 +525,7 @@ class EnumMeta(type):
     ) -> Type[E]:
         """Convenient implementation of creating a new enum."""
         meta_cls = cls.__class__
-        bases = (cls,) if type is None else (type, cls)
+        bases = (cls,) if type is None else (cls, type)
 
         _, enum_type = cls._get_member_and_enum_type(bases)
         cls_dict = meta_cls.__prepare__(class_name, bases)
@@ -1127,6 +1111,9 @@ class StrFormat(Trait):
 
 class Order(Trait):
     """Trait that implements ordering (==, !=, <, >, <= and >=) for enums."""
+
+    def __hash__(self) -> int:  # need to define hash because we are defining equality
+        return hash(self._name)
 
     def __eq__(self, other: Union[T, Enum]) -> bool:
         try:

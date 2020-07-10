@@ -308,6 +308,24 @@ Because ``IntEnum`` and ``IntFlag`` are subclasses of ``int``, they lose their m
 
     print(Access.SIMPLE + Access.MAIN)  # 3
 
+Method Resolution Order (MRO)
+-----------------------------
+
+``enums.py`` requires the following definiton of new ``Enum`` subclass:
+
+.. code-block:: plain
+
+    EnumName([mixin_type, ...] [data_type] enum_type)
+
+For example:
+
+.. code-block:: python3
+
+    class FloatEnum(StrFormat, float, Enum):
+        ...
+
+If ``data_type`` is given, it is moved to the end of bases, so example above will turn into ``(StrFormat, Enum, float)``.
+
 Traits
 ------
 
