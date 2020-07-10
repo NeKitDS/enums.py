@@ -58,7 +58,7 @@ __title__ = "enums"
 __author__ = "NeKitDS"
 __copyright__ = "Copyright 2020 NeKitDS"
 __license__ = "MIT"
-__version__ = "0.1.2"
+__version__ = "0.1.3"
 
 import sys
 from types import DynamicClassAttribute as dynamic_attribute, FrameType, MappingProxyType
@@ -83,15 +83,17 @@ except ImportError:
     NoReturn = None
 
 __all__ = (
-    "EnumDict",
     "EnumMeta",
     "Enum",
     "IntEnum",
     "Flag",
     "IntFlag",
+    "Trait",
+    "Order",
+    "StrFormat",
     "auto",
     "unique",
-    "generate_next_value",
+    "enum_generate_next_value",
 )
 
 DEFAULT_DOCUMENTATION = "An enumeration."
@@ -303,8 +305,8 @@ def _create_enum_member(
     return enum_member  # return member in case something wants to use it
 
 
-def generate_next_value(name: str, start: Optional[T], count: int, member_values: List[T]) -> T:
-    """Empty function that shows signature of generate_next_value() functions.
+def enum_generate_next_value(name: str, start: Optional[T], count: int, member_values: List[T]) -> T:
+    """Empty function that shows signature of enum_generate_next_value() functions.
 
     name: str -> Name of enum entry which value should be generated.
     start: Optional[T] -> Passed as None if auto() is being used.
@@ -317,7 +319,7 @@ def generate_next_value(name: str, start: Optional[T], count: int, member_values
 def incremental_next_value(
     name: str, start: Optional[T], count: int, member_values: List[T]
 ) -> T:
-    """Implementation of generate_next_value()
+    """Implementation of enum_generate_next_value()
     that automatically increments last possible member value.
 
     If not possible to generate new value, returns start (1 by default).
@@ -338,7 +340,7 @@ def incremental_next_value(
 def strict_bit_next_value(
     name: str, start: Optional[T], count: int, member_values: List[T]
 ) -> T:
-    """Implementation of generate_next_value()
+    """Implementation of enum_generate_next_value()
     that automatically generates next power of two after previous value.
 
     If not possible to generate new value, returns start (1 by default).
@@ -364,14 +366,20 @@ class EnumDict(Dict[str, U]):
     def __init__(self) -> None:
         super().__init__()
 
-        self._generate_next_value: Optional[Callable[..., T]] = None
+        self._enum_generate_next_value: Optional[Callable[..., T]] = None
         self._member_names: List[str] = []
         self._member_values: List[T] = []
         self._ignore: List[str] = []
 
     def __setitem__(self, key: str, value: T) -> None:
-        if key == "generate_next_value":  # allow setting generate_next_value() function
-            self._generate_next_value = value
+        if key == "enum_ignore":
+            if isinstance(value, str):  # process enum_ignore if given a string
+                value = list(filter(bool, value.replace(",", " ").split()))
+
+            self._ignore = value
+
+        elif key == "enum_generate_next_value":  # setting enum_generate_next_value() function
+            self._enum_generate_next_value = value
 
         elif _is_strict_dunder(key) or _is_descriptor(value) or key in self._ignore:
             pass
@@ -387,11 +395,12 @@ class EnumDict(Dict[str, U]):
 
             if isinstance(value, auto):
                 if value.value is null:  # if null => generate next value
-                    if self._generate_next_value is None:
+                    if self._enum_generate_next_value is None:
                         raise RuntimeError(
-                            f"Attempt to use auto value while generate_next_value was not defined."
+                            "Attempt to use auto value while "
+                            "enum_generate_next_value was not defined."
                         )
-                    value.value = self._generate_next_value(
+                    value.value = self._enum_generate_next_value(
                         key, None, len(self._member_names), self._member_values.copy()
                     )
                 value = value.value
@@ -411,20 +420,22 @@ class EnumDict(Dict[str, U]):
 class EnumMeta(type):
     @classmethod
     def __prepare__(meta_cls, cls, bases: Tuple[Type[T], ...], **kwargs) -> EnumDict:
-        """Prepare class initialization by making EnumDict aware of generate_next_value()."""
+        """Prepare class initialization by making EnumDict aware of enum_generate_next_value()."""
         enum_dict = EnumDict()
 
         member_type, enum_type = meta_cls._get_member_and_enum_type(bases)
-        enum_dict["generate_next_value"] = getattr(enum_type, "generate_next_value", None)
+        enum_dict["enum_generate_next_value"] = getattr(
+            enum_type, "enum_generate_next_value", None
+        )
 
         return enum_dict
 
     def __new__(meta_cls, cls, bases: Tuple[Type[T], ...], cls_dict: EnumDict) -> Type[E]:
         """Initialize new class. This function is *very* magical."""
-        # append enum_ignore to itself
+        # add enum_ignore to self
         cls_dict.setdefault("enum_ignore", []).append("enum_ignore")
-        # remove all keys listed in enum_ignore
-        for key in cls_dict["enum_ignore"]:
+
+        for key in cls_dict["enum_ignore"]:  # remove all keys in enum_ignore
             cls_dict.pop(key, None)
 
         member_type, enum_type = meta_cls._get_member_and_enum_type(bases)
@@ -542,7 +553,9 @@ class EnumMeta(type):
             original_names, names = names, []
             member_values = []
             for count, name in enumerate(original_names):
-                value = enum_type.generate_next_value(name, start, count, member_values.copy())
+                value = enum_type.enum_generate_next_value(
+                    name, start, count, member_values.copy()
+                )
                 member_values.append(value)
                 names.append((name, value))
 
@@ -610,7 +623,7 @@ class EnumMeta(type):
         """Add new member to the enum. auto() is allowed."""
         if isinstance(value, auto):
             if value.value is null:  # if null => generate next value
-                value.value = cls.generate_next_value(
+                value.value = cls.enum_generate_next_value(
                     name, None, len(cls._member_names), cls._member_values.copy()
                 )
             value = value.value
@@ -711,8 +724,11 @@ class EnumMeta(type):
 
         enum_type = bases[-1]
 
-        if not issubclass(enum_type, Enum):
+        if Enum and not issubclass(enum_type, Enum):
             raise TypeError(f"New enumerations should be created as {ENUM_DEFINITION}.")
+
+        if enum_type._member_map:
+            raise TypeError("Enumerations can not be extended.")
 
         member_type = _find_data_type(bases)
 
@@ -806,7 +822,7 @@ class Enum(metaclass=EnumMeta):
 
             raise error_invalid from exception
 
-    generate_next_value = incremental_next_value
+    enum_generate_next_value = staticmethod(incremental_next_value)
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}.{self._name}: {self._value}>"
@@ -873,7 +889,7 @@ def unique(enumeration: Type[Enum]) -> Type[Enum]:
 class Flag(Enum):
     """Support for bit flags."""
 
-    generate_next_value = strict_bit_next_value
+    enum_generate_next_value = staticmethod(strict_bit_next_value)
 
     @classmethod
     def enum_missing(cls, value: T) -> Enum:
@@ -941,8 +957,8 @@ class Flag(Enum):
 
         return result
 
-    def decompose(self, reverse: bool = True) -> List[Enum]:
-        """Decompose composite flag into initial flags."""
+    def decompose(self, reverse: bool = False) -> List[Enum]:
+        """Decompose composite flag into all flags it can contain."""
         members, _ = _decompose(self.__class__, self._value)
 
         if reverse:
@@ -952,7 +968,7 @@ class Flag(Enum):
 
     @dynamic_attribute
     def composite_name(self) -> str:
-        """Composite name of the composite Flag, e.g. READ|WRITE."""
+        """Composite name of the composite Flag."""
         return "|".join(
             map(str, (
                 (member._name or member._value) for member in self.decompose()
@@ -961,7 +977,7 @@ class Flag(Enum):
 
     @dynamic_attribute
     def title(self) -> str:
-        """Title of the Flag, which accounts for composites, e.g. (Read) or (Read, Write)."""
+        """Title of the Flag, which accounts for composites."""
         return ", ".join(
             map(_make_readable, (
                 (member._name or member._value) for member in self.decompose()
@@ -1096,6 +1112,55 @@ def _power_of_two(value: int) -> bool:
     if value < 1:
         return False
     return value == 2 ** _high_bit(value)
+
+
+class Trait:
+    """Base class to indicate traits (aka mixins) for enums."""
+
+
+class StrFormat(Trait):
+    """Trait that calls str(member) when formatting."""
+
+    def __format__(self, format_spec: str) -> str:
+        return str(self).__format__(format_spec)
+
+
+class Order(Trait):
+    """Trait that implements ordering (==, !=, <, >, <= and >=) for enums."""
+
+    def __eq__(self, other: Union[T, Enum]) -> bool:
+        try:
+            other = self.__class__(other)
+        except Exception:  # noqa
+            return NotImplemented
+        return self._value == other._value
+
+    def __ne__(self, other: Union[T, Enum]) -> bool:
+        try:
+            other = self.__class__(other)
+        except Exception:  # noqa
+            return NotImplemented
+        return self._value != other._value
+
+    def __lt__(self, other: Union[T, Enum]) -> bool:
+        try:
+            other = self.__class__(other)
+        except Exception:  # noqa
+            return NotImplemented
+        return self._value < other._value
+
+    def __gt__(self, other: Union[T, Enum]) -> bool:
+        try:
+            other = self.__class__(other)
+        except Exception:  # noqa
+            return NotImplemented
+        return self._value > other._value
+
+    def __le__(self, other: Union[T, Enum]) -> bool:
+        return self < other or self == other
+
+    def __ge__(self, other: Union[T, Enum]) -> bool:
+        return self > other or self == other
 
 
 if __name__ == "__main__":

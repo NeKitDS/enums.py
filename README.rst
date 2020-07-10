@@ -29,16 +29,18 @@ enums.py
 
 enums.py is a module that implements enhanced enums for Python.
 
+**Incompatible with standard library enums!**
+
 Below are many examples of using this module.
 
-Importing Functions
--------------------
+Importing
+---------
 
-Here are main classes that are used in enums:
+Here are main classes and functions that are used in enums:
 
 .. code-block:: python3
 
-    from enums import Enum, Flag, IntEnum, IntFlag, auto, unique
+    from enums import Enum, Flag, IntEnum, IntFlag, Order, StrFormat, auto, unique
 
 Creating Enums
 --------------
@@ -90,8 +92,73 @@ Same with ``auto()``, of course:
 All code snippets above produce Enum ``Color`` in the end, which has 3 members:
 
 - ``<Color.RED: 1>``
+
 - ``<Color.GREEN: 2>``
+
 - ``<Color.BLUE: 3>``
+
+Enums with Arguments
+--------------------
+
+Enum members that have ``tuple`` values but do not subclass ``tuple``
+are interpreted as values passed to ``__init__`` of their class:
+
+.. code-block:: python3
+
+    class Planet(Enum):
+        MERCURY = (3.303e+23, 2.4397e6)
+        VENUS   = (4.869e+24, 6.0518e6)
+        EARTH   = (5.976e+24, 6.37814e6)
+        MARS    = (6.421e+23, 3.3972e6)
+        JUPITER = (1.9e+27,   7.1492e7)
+        SATURN  = (5.688e+26, 6.0268e7)
+        URANUS  = (8.686e+25, 2.5559e7)
+        NEPTUNE = (1.024e+26, 2.4746e7)
+
+        def __init__(self, mass: float, radius: float) -> None:
+            self.mass = mass  # kg
+            self.radius = radius  # m
+
+        @property
+        def surface_gravity(self) -> float:
+            # universal gravitational constant
+            G = 6.67300E-11  # m^3 kg^(-1) s^(-2)
+            return G * self.mass / (self.radius * self.radius)
+
+    print(Planet.EARTH.value)  # (5.976e+24, 6378140.0)
+    print(Planet.EARTH.surface_gravity)  # 9.802652743337129
+
+Iteration
+---------
+
+It is possible to iterate over unique enum members:
+
+.. code-block:: python3
+
+    Color = Enum("Color", RED=1, GREEN=2, BLUE=3)
+
+    for color in Color:
+        print(Color.title)
+
+    # Red
+    # Green
+    # Blue
+
+Or over all members, including aliases:
+
+.. code-block:: python3
+
+    Color = Enum("Color", RED=1, GREEN=2, BLUE=3, R=1, G=2, B=3)
+
+    for name, color in Color.members.items():
+        print(name, color.name)
+
+    # RED RED
+    # GREEN GREEN
+    # BLUE BLUE
+    # R RED
+    # G GREEN
+    # B BLUE
 
 Member Attributes
 -----------------
@@ -99,7 +166,9 @@ Member Attributes
 Enum members have several useful attributes:
 
 - *name*, which represents their actual name;
+
 - *value*, which contains their value;
+
 - *title*, which is more human-readable version of their *name*.
 
 .. code-block:: python3
@@ -128,9 +197,9 @@ You can use ``Flag.from_args`` to create composite flag from multiple values/nam
 
 .. code-block:: python3
 
-    FileMode = Flag("FileMode", "NULL READ WRITE EXECUTE", start=0)
-    FileMode.from_args("read", "write", "execute")  # <FileMode.READ|WRITE|EXECUTE: 7>
-    FileMode.from_args(1, 2)  # <FileMode.READ|WRITE: 3>
+    Perm = Flag("Perm", "Z X W R", start=0)
+    Perm.from_args("r", "w", "x")  # <Perm.R|W|X: 7>
+    Perm.from_args(2, 4)  # <Perm.R|W: 6>
 
 There is also ``Enum.from_value``, which tries to use ``Enum.from_name`` if given value is string,
 and otherwise (and if failed), it attempts by-value lookup. Also, this function accepts ``default``
@@ -140,11 +209,11 @@ Example:
 
 .. code-block:: python3
 
-    class FileMode(Flag):
-        NULL, READ, WRITE, EXECUTE = 0, 1, 2, 4
+    class Perm(Flag):
+        Z, X, W, R = 0, 1, 2, 4
 
-    FileMode.from_value(8, default=0)  # <FileMode.NULL: 0>
-    FileMode.from_value("broken", "read")  # <FileMode.READ: 1>
+    Perm.from_value(8, default=0)  # <Perm.Z: 0>
+    Perm.from_value("broken", "r")  # <Perm.R: 4>
 
 Flag Enums
 ----------
@@ -154,32 +223,55 @@ along with operations on them, such as **OR** ``|``, **AND** ``&``, **XOR** ``^`
 
 .. code-block:: python3
 
-    class FileMode(Flag):
-        NULL = 0
-        READ = 1
-        WRITE = 2
-        EXECUTE = 4
+    class Perm(Flag):
+        Z = 0
+        X = 1
+        W = 2
+        R = 4
 
-    # <FileMode.READ|WRITE: 3>
-    READ_WRITE = FileMode.READ | FileMode.WRITE
+    # <Perm.R|W: 6>
+    RW = Perm.R | Perm.W
 
-    # <FileMode.READ: 1>
-    READ = (FileMode.READ | FileMode.WRITE) & FileMode.READ
+    # <Perm.R: 4>
+    R = (Perm.R | Perm.W) & Perm.R
 
-    # <FileMode.WRITE|EXECUTE: 6>
-    WRITE_EXECUTE = FileMode.WRITE ^ FileMode.EXECUTE)
+    # <Perm.W|X: 3>
+    WX = Perm.W ^ Perm.X
 
-    # <FileMode.NULL: 0>
-    NULL = FileMode.EXECUTE ^ FileMode.EXECUTE
+    # <Perm.Z: 0>
+    Z = Perm.X ^ Perm.X
 
-    # <FileMode.READ|EXECUTE: 5>
-    READ_EXECUTE = ~FileMode.WRITE
+    # <Perm.R|X: 5>
+    RX = ~Perm.W
 
 Integers can be used instead of enum members:
 
 .. code-block:: python3
 
-    READ_WRITE_EXECUTE = FileMode.NULL | 1 | 2 | 4
+    RWX = Perm.Z | 1 | 2 | 4
+
+Flag Combinations
+-----------------
+
+Flag members have ``Flag.decompose()`` method, which will include all named flags and all named combinations of flags that are in their value.
+
+``str()`` and ``repr()`` on flags will use ``Flag.decompose()`` for composite flags that do not have names.
+
+.. code-block:: python3
+
+    class Color(StrFormat, Enum):
+        RED = 1
+        GREEN = 2
+        BLUE = 4
+        YELLOW = RED | GREEN
+        MAGENTA = RED | BLUE
+        CYAN = GREEN | BLUE
+
+    # named combination
+    print(repr(Color(3)))  # <Color.YELLOW: 3>
+
+    # unnamed combination
+    print(repr(Color(7)))  # <Color.CYAN|MAGENTA|BLUE|YELLOW|GREEN|RED: 7>
 
 Type Restriction and Inheritance
 --------------------------------
@@ -193,18 +285,79 @@ Enum members can be restricted to have values of the same type:
         OTHER = "2"  # will be casted
         BROKEN = "broken"  # error will be raised on creation
 
-As well as inherit behaviour from that type:
+As well as inherit behavior from that type:
 
 .. code-block:: python3
 
     class Access(IntFlag):
-        NULL = 0
+        NONE = 0
         SIMPLE = 1
         MAIN = 2
 
     FULL = Access.SIMPLE | Access.MAIN
     assert FULL > Access.MAIN
     print(FULL.bit_length())  # 2
+
+Because ``IntEnum`` and ``IntFlag`` are subclasses of ``int``, they lose their membership when ``int`` operations are used with them:
+
+.. code-block:: python3
+
+    Access = IntFlag("Access", "NONE SIMPLE MAIN", start=0)
+
+    print(repr(Access.NONE | Access.SIMPLE | Access.MAIN))  # <Access.MAIN|SIMPLE: 3>
+
+    print(Access.SIMPLE + Access.MAIN)  # 3
+
+Traits
+------
+
+``enums.py`` implements special *mixins*, called *Traits*.
+Each Trait implements some functionality for enums, but does not subclass Enum.
+Therefore they are pretty much useless on their own.
+
+StrFormat
+~~~~~~~~~
+
+Default ``__format__`` of ``Enum`` will attempt to use ``__format__`` of member data type, if given:
+
+.. code-block:: python3
+
+    class Foo(IntEnum):
+        BAR = 42
+
+    print(f"{Foo.BAR}")  # 42
+
+``StrFormat`` overwrites that behavior and uses ``str(member).__format__(format_spec)`` instead:
+
+.. code-block:: python3
+
+    class Foo(StrFormat, IntEnum):
+        BAR = 42
+
+    print(f"{Foo.BAR}")  # Foo.BAR (Bar)
+
+Order
+~~~~~
+
+``Order`` Trait implements ordering (``==``, ``!=``, ``<``, ``>``, ``<=`` and ``>=``) for Enum members.
+This function will attempt to find member by value.
+
+Example:
+
+.. code-block:: python3
+
+    class Grade(Order, Enum):
+        A = 5
+        B = 4
+        C = 3
+        D = 2
+        F = 1
+
+    print(Grade.A > Grade.C)  # True
+    print(Grade.F <= Grade.D)  # True
+
+    print(Grade.B == 4)  # True
+    print(Grade.F >= 0)  # True
 
 Unique Enums
 ------------
@@ -238,6 +391,101 @@ With the following exception:
 .. code-block:: python3
 
     ValueError: Duplicates found in <enum 'Color'>: R -> RED, G -> GREEN, B -> BLUE.
+
+Special Names
+-------------
+
+``enums.py`` uses special names for managing behavior:
+
+- *enum_missing: classmethod function(cls: Type[Enum], value: T) -> Enum*
+
+- *enum_ignore: Union[str, Iterable[str]]*
+
+- *enum_generate_next_value: function(name: str, start: Optional[T], count: int, member_values: List[T]) -> T*
+
+- *_name: str*
+
+- *_value: T*
+
+enum_missing
+~~~~~~~~~~~~
+
+Class method that should be used in order to process values that are not present in the enumeration:
+
+.. code-block:: python3
+
+    from typing import Union
+
+    class Speed(Enum):
+        SLOW = 1
+        NORMAL = 2
+        FAST = 3
+
+        @classmethod
+        def enum_missing(cls, value: Union[float, int]) -> Enum:
+            if value < 1:
+                return cls.SLOW
+            elif value > 3:
+                return cls.FAST
+            else:
+                return cls.NORMAL
+
+    print(repr(Speed(5)))  # <Speed.FAST: 3>
+
+enum_ignore
+~~~~~~~~~~~
+
+Iterable of strings or a string that contains names of class members that should be ignored when creating enum members:
+
+.. code-block:: python3
+
+    class Time(IntEnum):
+        enum_ignore = ["Time", "second"]  # or "Time, second" or "Time second" or "Time,second"
+
+        Time = vars()
+
+        for second in range(60):
+            Time[f"s_{second}"] = second
+
+    print(repr(Time.s_59))  # <Time.s_59: 59>
+    print(repr(Time.s_0)) # <Time.s_0: 0>
+
+enum_generate_next_value
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+Static method that takes member name, start value (default is None, unless specified otherwise),
+count of unique members already created and list of all member values (including aliases).
+
+This method should output value for new enum member:
+
+.. code-block:: python3
+
+    from typing import List, Optional, T
+
+    class CountEnum(Enum):
+        @staticmethod
+        def enum_generate_next_value(
+            name: str, start: Optional[T], count: int, values: List[T]
+        ) -> T:
+            """Return count of unique members, + 1."""
+            return count + 1
+
+    class Mark(CountEnum):
+        F = auto()  # 1
+        D = auto()  # 2
+        C = auto()  # 3
+        B = auto()  # 4
+        A = auto()  # 5
+
+_name
+~~~~~
+
+Private attribute, name of the enum member. Ideally it should *never* be modified.
+
+_value
+~~~~~~
+
+Private attribute, value of the enum member. Again, it better *not* be modified.
 
 Updating (Mutating) Enums
 -------------------------
@@ -291,8 +539,12 @@ Changlelog
 ----------
 
 - **0.1.0** - Initial release, almost full support of standard enum module;
+
 - **0.1.1** - Make bitwise operations in Flag smarter;
-- **0.1.2** - Add IntEnum and IntFlag.
+
+- **0.1.2** - Add IntEnum and IntFlag;
+
+- **0.1.3** - Add Traits and fix bugs.
 
 Authors
 -------
