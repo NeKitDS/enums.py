@@ -308,12 +308,12 @@ Because ``IntEnum`` and ``IntFlag`` are subclasses of ``int``, they lose their m
 
     print(Access.SIMPLE + Access.MAIN)  # 3
 
-Method Resolution Order (MRO)
------------------------------
+Method Resolution Order
+-----------------------
 
 ``enums.py`` requires the following definiton of new ``Enum`` subclass:
 
-.. code-block:: plain
+.. code-block:: python3
 
     EnumName([mixin_type, ...] [data_type] enum_type)
 
