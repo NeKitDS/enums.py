@@ -562,7 +562,9 @@ Changlelog
 
 - **0.1.2** - Add IntEnum and IntFlag;
 
-- **0.1.3** - Add Traits and fix bugs.
+- **0.1.3** - Add Traits and fix bugs;
+
+- **0.1.4** - Add nice dir() implementation for both Enum class and members.
 
 Authors
 -------

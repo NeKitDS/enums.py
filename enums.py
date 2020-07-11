@@ -58,7 +58,7 @@ __title__ = "enums"
 __author__ = "NeKitDS"
 __copyright__ = "Copyright 2020 NeKitDS"
 __license__ = "MIT"
-__version__ = "0.1.3"
+__version__ = "0.1.4"
 
 import sys
 from types import DynamicClassAttribute as dynamic_attribute, FrameType, MappingProxyType
@@ -97,10 +97,12 @@ __all__ = (
 )
 
 DEFAULT_DOCUMENTATION = "An enumeration."
+DEFAULT_DIR_INCLUDE = ["__class__", "__doc__", "__module__", "__members__"]  # some dir() dunders
 DESCRIPTOR_ATTRIBUTES = ("__get__", "__set__", "__delete__")  # attributes that define a descriptor
 ENUM_DEFINITION = "EnumName([mixin_type, ...] [data_type] enum_type)"  # enum subclass definition
 INVALID_ENUM_NAMES = {"mro", ""}  # any others?
-OBJECT_NEW = object.__new__  # default new function used to create enum valuess
+OBJECT_DIR = object.__dir__  # function to use for fetching dirs
+OBJECT_NEW = object.__new__  # default new function used to create enum values
 USELESS_NEW = {None, None.__new__, object.__new__}  # Enum's new is added here when it is defined
 
 E = TypeVar("E", bound="Enum")  # used for enum typing
@@ -151,6 +153,10 @@ def _ends_and_starts_with(string: str, char: str, times: int = 1, strict: bool =
         return main_check and string[part_len] != char and string[~part_len] != char  # ~x = -x-1
 
     return main_check
+
+
+def _is_special(string: str) -> bool:
+    return string.startswith(("_", "enum_"))
 
 
 def _get_frame(level: int = 0) -> Optional[FrameType]:
@@ -287,7 +293,9 @@ def _create_enum_member(
     return enum_member  # return member in case something wants to use it
 
 
-def enum_generate_next_value(name: str, start: Optional[T], count: int, member_values: List[T]) -> T:
+def enum_generate_next_value(
+    name: str, start: Optional[T], count: int, member_values: List[T]
+) -> T:
     """Empty function that shows signature of enum_generate_next_value() functions.
 
     name: str -> Name of enum entry which value should be generated.
@@ -603,6 +611,86 @@ class EnumMeta(type):
     def __getitem__(cls, name: str) -> E:
         return cls._member_map[name]
 
+    def __iter__(cls) -> Iterator[E]:
+        """Same as cls.get_members()."""
+        return cls.get_members()
+
+    def __reversed__(cls) -> Iterator[E]:
+        """Same as cls.get_members(reverse=True)."""
+        return cls.get_members(reverse=True)
+
+    def __len__(cls) -> int:
+        """Return count of unique members (no aliases)."""
+        return len(cls._member_names)
+
+    def __repr__(cls) -> str:
+        """Standard-like enum class representation."""
+        return f"<enum {cls.__name__!r}>"
+
+    def __setattr__(cls, name: str, value: T) -> None:
+        """Set new attribute, blocking member reassign attempts.
+        To add new fields, consider using Enum.add_member or Enum.update.
+        """
+        member_map = cls.__dict__.get("_member_map", {})  # this is used to prevent recursion
+
+        if name in member_map:
+            raise AttributeError(f"Attempt to reassign enum member: {member_map[name]}.")
+
+        super().__setattr__(name, value)
+
+    def __dir__(cls) -> List[str]:
+        added_behavior = [key for key in OBJECT_DIR(cls) if not _is_special(key)]
+        return DEFAULT_DIR_INCLUDE + added_behavior
+
+    @staticmethod
+    def _get_member_and_enum_type(bases: Tuple[Type[T], ...]) -> Tuple[Type[T], Type[E]]:
+        """Find data type and first enum type that are subclassed."""
+        if not bases:  # no bases => nothing to search => return defaults
+            return object, Enum
+
+        enum_type = bases[-1]
+
+        if Enum and not issubclass(enum_type, Enum):
+            raise TypeError(f"New enumerations should be created as {ENUM_DEFINITION}.")
+
+        if enum_type._member_map:
+            raise TypeError("Enumerations can not be extended.")
+
+        member_type = _find_data_type(bases)
+
+        return member_type, enum_type
+
+    @staticmethod
+    def _find_new(
+        cls_dict: EnumDict, member_type: Type[T], enum_type: Type[E]
+    ) -> Tuple[Callable[..., U], bool, bool]:  # new_func, new_member_save, new_use_args
+        """Find __new__ function to create member types with."""
+        new_func = cls_dict.get("__new__")
+
+        if new_func is None:
+            new_member_save = False
+
+            for method in ("__new_member__", "__new__"):  # check for __new_member__ first
+                for possible in (member_type, enum_type):
+                    target = getattr(possible, method, None)
+
+                    if target not in USELESS_NEW:
+                        new_func = target
+                        break
+
+                if new_func is not None:  # assigned in inner loop, break from outer loop
+                    break
+
+            else:
+                new_func = OBJECT_NEW
+
+        else:
+            new_member_save = True
+
+        new_use_args = new_func is not OBJECT_NEW
+
+        return new_func, new_member_save, new_use_args
+
     def add_member(cls, name: str, value: T) -> E:
         """Add new member to the enum. auto() is allowed."""
         if isinstance(value, auto):
@@ -672,82 +760,6 @@ class EnumMeta(type):
     def as_dict(cls) -> Dict[str, T]:
         """Return lower_name -> member_value mapping overall all members."""
         return {name.lower(): member.value for name, member in cls.members.items()}
-
-    def __iter__(cls) -> Iterator[E]:
-        """Same as cls.get_members()."""
-        return cls.get_members()
-
-    def __reversed__(cls) -> Iterator[E]:
-        """Same as cls.get_members(reverse=True)."""
-        return cls.get_members(reverse=True)
-
-    def __len__(cls) -> int:
-        """Return count of unique members (no aliases)."""
-        return len(cls._member_names)
-
-    def __repr__(cls) -> str:
-        """Standard-like enum class representation."""
-        return f"<enum {cls.__name__!r}>"
-
-    def __setattr__(cls, name: str, value: T) -> None:
-        """Set new attribute, blocking member reassign attempts.
-        To add new fields, consider using Enum.add_member or Enum.update.
-        """
-        member_map = cls.__dict__.get("_member_map", {})  # this is used to prevent recursion
-
-        if name in member_map:
-            raise AttributeError(f"Attempt to reassign enum member: {member_map[name]}.")
-
-        super().__setattr__(name, value)
-
-    @staticmethod
-    def _get_member_and_enum_type(bases: Tuple[Type[T], ...]) -> Tuple[Type[T], Type[E]]:
-        """Find data type and first enum type that are subclassed."""
-        if not bases:  # no bases => nothing to search => return defaults
-            return object, Enum
-
-        enum_type = bases[-1]
-
-        if Enum and not issubclass(enum_type, Enum):
-            raise TypeError(f"New enumerations should be created as {ENUM_DEFINITION}.")
-
-        if enum_type._member_map:
-            raise TypeError("Enumerations can not be extended.")
-
-        member_type = _find_data_type(bases)
-
-        return member_type, enum_type
-
-    @staticmethod
-    def _find_new(
-        cls_dict: EnumDict, member_type: Type[T], enum_type: Type[E]
-    ) -> Tuple[Callable[..., U], bool, bool]:  # new_func, new_member_save, new_use_args
-        """Find __new__ function to create member types with."""
-        new_func = cls_dict.get("__new__")
-
-        if new_func is None:
-            new_member_save = False
-
-            for method in ("__new_member__", "__new__"):  # check for __new_member__ first
-                for possible in (member_type, enum_type):
-                    target = getattr(possible, method, None)
-
-                    if target not in USELESS_NEW:
-                        new_func = target
-                        break
-
-                if new_func is not None:  # assigned in inner loop, break from outer loop
-                    break
-
-            else:
-                new_func = OBJECT_NEW
-
-        else:
-            new_member_save = True
-
-        new_use_args = new_func is not OBJECT_NEW
-
-        return new_func, new_member_save, new_use_args
 
 
 class Enum(metaclass=EnumMeta):
@@ -830,6 +842,13 @@ class Enum(metaclass=EnumMeta):
 
     def __reduce_ex__(self, protocol: int) -> Tuple[Type[E], T]:
         return self.__class__, (self._value,)
+
+    def __dir__(self) -> List[str]:
+        added_behavior = [
+            key for key in OBJECT_DIR(self)
+            if not _is_special(key) and key not in self._member_map
+        ]
+        return DEFAULT_DIR_INCLUDE + added_behavior
 
     @dynamic_attribute
     def title(self) -> str:
