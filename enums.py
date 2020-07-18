@@ -58,7 +58,7 @@ __title__ = "enums"
 __author__ = "NeKitDS"
 __copyright__ = "Copyright 2020 NeKitDS"
 __license__ = "MIT"
-__version__ = "0.1.4"
+__version__ = "0.1.5"
 
 import sys
 from types import DynamicClassAttribute as dynamic_attribute, FrameType, MappingProxyType
@@ -452,10 +452,9 @@ class EnumMeta(type):
 
         try:  # try to remove member type from the list
             base_list.remove(member_type)
+            base_list.append(member_type)  # and add it and the end
         except ValueError:  # not in base_list
             pass
-
-        base_list.append(member_type)  # and add it and the end
 
         bases = tuple(base_list)  # now back to tuple
 
