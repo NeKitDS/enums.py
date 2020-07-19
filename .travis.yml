@@ -9,7 +9,7 @@ install:
   # install library + flake8 + pytest
   - pip install -U .[test]
   # install coverage
-  - pip install -U coverage.py
+  - pip install -U coverage
   # install coveralls
   - pip install -U coveralls
 
