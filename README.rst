@@ -458,7 +458,7 @@ Works same as putting ``enum_ignore`` inside the class (default is ``()`` (empty
 start
 ~~~~~
 
-Defines a start value that should be used for enum members (default is ``None``):
+Just like ``enum_start``, defines a *start* value that should be used for enum members (default is ``None``):
 
 .. code-block:: python3
 
@@ -478,9 +478,9 @@ Special Names
 
 - *enum_generate_next_value: function(name: str, start: Optional[T], count: int, member_values: List[T]) -> T*
 
-- *enum_auto_on_missing: bool*;
+- *enum_auto_on_missing: bool*
 
-- *enum_start: T*;
+- *enum_start: T*
 
 - *_name: str*
 
