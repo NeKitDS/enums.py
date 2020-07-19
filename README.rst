@@ -23,6 +23,14 @@ enums.py
     :target: https://pypi.python.org/pypi/enums.py
     :alt: Library Downloads/Month
 
+.. image:: https://app.codacy.com/project/badge/Grade/5a7b36c3304d40818c5d8b4181fe8564
+    :target: https://app.codacy.com/project/NeKitDS/gd.py/dashboard
+    :alt: Code Quality [Codacy]
+
+.. image:: https://img.shields.io/coveralls/github/NeKitDS/enums.py
+    :target: https://coveralls.io/github/NeKitDS/enums.py
+    :alt: Code Coverage
+
 .. image:: https://img.shields.io/endpoint.svg?url=https%3A%2F%2Fshieldsio-patreon.herokuapp.com%2Fnekit%2Fpledges
     :target: https://patreon.com/nekit
     :alt: Patreon Page [Support]
@@ -352,7 +360,7 @@ Default ``__format__`` of ``Enum`` will attempt to use ``__format__`` of member 
     class Foo(StrFormat, IntEnum):
         BAR = 42
 
-    print(f"{Foo.BAR}")  # Foo.BAR (Bar)
+    print(f"{Foo.BAR}")  # Foo.BAR
 
 Order
 ~~~~~
@@ -410,6 +418,55 @@ With the following exception:
 
     ValueError: Duplicates found in <enum 'Color'>: R -> RED, G -> GREEN, B -> BLUE.
 
+Class Keyword Arguments
+-----------------------
+
+Enum class knows 3 class keyword arguments:
+
+- *auto_on_missing: bool*;
+- *ignore: Union[str, Iterable[str]]*;
+- *start: T*.
+
+auto_on_missing
+~~~~~~~~~~~~~~~
+
+Boolean flag, if set to ``True`` (default is ``False``), allows to do something like:
+
+.. code-block:: python3
+
+    class Color(Enum, auto_on_missing=True):
+        RED  # 1
+        GREEN  # 2
+        BLUE  # 3
+
+    print(repr(Color.RED))  # <Color.RED: 1>
+
+ignore
+~~~~~~
+
+Works same as putting ``enum_ignore`` inside the class (default is ``()`` (empty tuple)):
+
+.. code-block:: python3
+
+    class Time(Enum, ignore=("time_vars", "day")):
+        time_vars = vars()
+        for day in range(366):
+            time_vars[f"day_{day}"] = day
+
+    print(repr(Time.day_365))  # <Time.day_365: 365>
+
+start
+~~~~~
+
+Defines a start value that should be used for enum members (default is ``None``):
+
+.. code-block:: python3
+
+    class Perm(Flag, auto_on_missing=True, start=0):
+        Z, X, W, R  # 0, 1, 2, 4
+
+    print(repr(Perm.R | Perm.W))  # <Perm.R|W: 6>
+
 Special Names
 -------------
 
@@ -420,6 +477,10 @@ Special Names
 - *enum_ignore: Union[str, Iterable[str]]*
 
 - *enum_generate_next_value: function(name: str, start: Optional[T], count: int, member_values: List[T]) -> T*
+
+- *enum_auto_on_missing: bool*;
+
+- *enum_start: T*;
 
 - *_name: str*
 
@@ -495,6 +556,22 @@ This method should output value for new enum member:
         B = auto()  # 4
         A = auto()  # 5
 
+enum_auto_on_missing
+~~~~~~~~~~~~~~~~~~~~
+
+Boolean that indicates whether auto() should be used to generate values for missing names:
+
+.. code-block:: python3
+
+    class Color(Enum):
+        enum_auto_on_missing = True
+        RED, GREEN, BLUE  # 1, 2, 3
+
+enum_start
+~~~~~~~~~~
+
+Variable that indicates what value should be passed as *start* to *enum_generate_next_value*.
+
 _name
 ~~~~~
 
@@ -564,7 +641,11 @@ Changlelog
 
 - **0.1.3** - Add Traits and fix bugs;
 
-- **0.1.4** - Add nice dir() implementation for both Enum class and members.
+- **0.1.4** - Add nice dir() implementation for both Enum class and members;
+
+- **0.1.5** - Fix small bugs;
+
+- **0.2.0** - Fix IntEnum to be almost even with standard library, fix bugs and add tests.
 
 Authors
 -------

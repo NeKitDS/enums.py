@@ -58,7 +58,7 @@ __title__ = "enums"
 __author__ = "NeKitDS"
 __copyright__ = "Copyright 2020 NeKitDS"
 __license__ = "MIT"
-__version__ = "0.1.5"
+__version__ = "0.2.0"
 
 import sys
 from types import DynamicClassAttribute as dynamic_attribute, FrameType, MappingProxyType
@@ -79,7 +79,8 @@ from typing import (
 
 try:
     from typing import NoReturn  # this may error on earlier version
-except ImportError:
+
+except ImportError:  # pragma: no cover
     NoReturn = None
 
 __all__ = (
@@ -114,7 +115,7 @@ Enum: Type[E] = None  # we define Enum here as None, because it is used in EnumM
 class Singleton:
     instance = None
 
-    def __repr__(self) -> str:
+    def __repr__(self) -> str:  # pragma: no cover
         return str(self.__class__.__name__)
 
     @classmethod
@@ -140,9 +141,12 @@ def _lower_name(name: str) -> str:  # turn "SomeName" or "some_name" into "somen
     return name.lower().replace("_", "")
 
 
-def _ends_and_starts_with(string: str, char: str, times: int = 1, strict: bool = True) -> bool:
+def _starts_and_ends_with(string: str, char: str, times: int = 1, strict: bool = True) -> bool:
     if len(char) != 1:
         raise ValueError(f"Expected char to be a string of length 1, got {char!r}.")
+
+    if not times:
+        return True  # all strings start and end with empty strings
 
     part = char * times
     part_len = len(part)
@@ -164,7 +168,7 @@ def _get_frame(level: int = 0) -> Optional[FrameType]:
 
 
 def _is_strict_dunder(string: str) -> bool:
-    return _ends_and_starts_with(string, "_", times=2)
+    return _starts_and_ends_with(string, "_", times=2)
 
 
 def _is_descriptor(some_object: Any) -> bool:
@@ -262,6 +266,7 @@ def _create_enum_member(
         for name, canonical_member in enum_class._member_map.items():
             if canonical_member._value == enum_member._value:
                 enum_member = canonical_member
+                break
 
         else:
             # aliases should not appear in member names (only in __members__)
@@ -295,7 +300,7 @@ def _create_enum_member(
 
 def enum_generate_next_value(
     name: str, start: Optional[T], count: int, member_values: List[T]
-) -> T:
+) -> T:  # pragma: no cover
     """Empty function that shows signature of enum_generate_next_value() functions.
 
     name: str -> Name of enum entry which value should be generated.
@@ -306,9 +311,7 @@ def enum_generate_next_value(
     raise NotImplementedError
 
 
-def incremental_next_value(
-    name: str, start: Optional[T], count: int, member_values: List[T]
-) -> T:
+def incremental_next_value(name: str, start: Optional[T], count: int, member_values: List[T]) -> T:
     """Implementation of enum_generate_next_value()
     that automatically increments last possible member value.
 
@@ -320,16 +323,14 @@ def incremental_next_value(
     for member_value in reversed(member_values):  # find value we can increment
         try:
             return member_value + 1
-        except TypeError:  # unsupported operand type(s) for +: T, int
+        except TypeError:  # unsupported operand type(s) for +: T, int  # pragma: no cover
             pass
 
     else:
         return start
 
 
-def strict_bit_next_value(
-    name: str, start: Optional[T], count: int, member_values: List[T]
-) -> T:
+def strict_bit_next_value(name: str, start: Optional[T], count: int, member_values: List[T]) -> T:
     """Implementation of enum_generate_next_value()
     that automatically generates next power of two after previous value.
 
@@ -351,34 +352,40 @@ def strict_bit_next_value(
 
 
 class EnumDict(Dict[str, U]):
-    auto_on_missing = False  # XXX: this might be added in future
-
     def __init__(self) -> None:
         super().__init__()
 
+        self._auto_on_missing: bool = False
+        self._start: Optional[T] = None
         self._enum_generate_next_value: Optional[Callable[..., T]] = None
         self._member_names: List[str] = []
         self._member_values: List[T] = []
         self._ignore: List[str] = []
 
     def __setitem__(self, key: str, value: T) -> None:
-        if key == "enum_ignore":
-            if isinstance(value, str):  # process enum_ignore if given a string
-                value = list(filter(bool, value.replace(",", " ").split()))
+        if key == "enum_auto_on_missing":
+            self._auto_on_missing = value
 
-            self._ignore = value
+        elif key == "enum_ignore":
+            if isinstance(value, str):  # process enum_ignore if given a string
+                value = filter(bool, value.replace(",", " ").split())
+
+            self._ignore = list(value)
 
         elif key == "enum_generate_next_value":  # setting enum_generate_next_value() function
             self._enum_generate_next_value = value
+
+        elif key == "enum_start":
+            self._start = value
+
+        elif key in self._member_names:
+            # something overrides enum?
+            raise ValueError(f"Attempt to reuse key: {key!r}.")
 
         elif _is_strict_dunder(key) or _is_descriptor(value) or key in self._ignore:
             pass
 
         else:
-            if key in self._member_names:
-                # something overrides enum?
-                raise ValueError(f"Attempt to reuse key: {key!r}.")
-
             if key in self:
                 # enum overrides something?
                 raise ValueError(f"{key!r} already defined as: {self[key]!r}.")
@@ -391,7 +398,7 @@ class EnumDict(Dict[str, U]):
                             "enum_generate_next_value was not defined."
                         )
                     value.value = self._enum_generate_next_value(
-                        key, None, len(self._member_names), self._member_values.copy()
+                        key, self._start, len(self._member_names), self._member_values.copy()
                     )
                 value = value.value
 
@@ -401,7 +408,7 @@ class EnumDict(Dict[str, U]):
         super().__setitem__(key, value)
 
     def __missing__(self, key: str) -> None:
-        if _is_strict_dunder(key) or not self.auto_on_missing:
+        if _is_strict_dunder(key) or not self._auto_on_missing:
             raise KeyError(key)
 
         self[key] = auto()
@@ -409,23 +416,48 @@ class EnumDict(Dict[str, U]):
 
 class EnumMeta(type):
     @classmethod
-    def __prepare__(meta_cls, cls, bases: Tuple[Type[T], ...], **kwargs) -> EnumDict:
-        """Prepare class initialization by making EnumDict aware of enum_generate_next_value()."""
+    def __prepare__(
+        meta_cls,
+        cls: str,
+        bases: Tuple[Type[T], ...],
+        *,
+        auto_on_missing: bool = False,
+        ignore: Optional[Union[str, Iterable[str]]] = None,
+        start: Optional[U] = None,
+        **kwargs,
+    ) -> EnumDict:
+        """Prepare class initialization."""
         enum_dict = EnumDict()
 
-        member_type, enum_type = meta_cls._get_member_and_enum_type(bases)
-        enum_dict["enum_generate_next_value"] = getattr(
-            enum_type, "enum_generate_next_value", None
-        )
+        _, enum_type = meta_cls._get_member_and_enum_type(bases)
+
+        for key, value in dict(
+            enum_auto_on_missing=auto_on_missing,
+            enum_generate_next_value=getattr(enum_type, "enum_generate_next_value", None),
+            enum_ignore=(ignore or []),
+            enum_start=start,
+        ).items():
+            enum_dict[key] = value
 
         return enum_dict
 
-    def __new__(meta_cls, cls, bases: Tuple[Type[T], ...], cls_dict: EnumDict) -> Type[E]:
+    def __new__(
+        meta_cls,
+        cls: str,
+        bases: Tuple[Type[T], ...],
+        cls_dict: EnumDict,
+        *,
+        # these are used by our meta_cls.__prepare__(...)
+        auto_on_missing: bool = False,
+        ignore: Optional[Union[str, Iterable[str]]] = None,
+        start: Optional[U] = None,
+    ) -> Type[E]:
         """Initialize new class. This function is *very* magical."""
         # add enum_ignore to self
-        cls_dict.setdefault("enum_ignore", []).append("enum_ignore")
+        enum_ignore = list(cls_dict.get("enum_ignore", []))
+        enum_ignore.append("enum_ignore")
 
-        for key in cls_dict["enum_ignore"]:  # remove all keys in enum_ignore
+        for key in enum_ignore:  # remove all keys in enum_ignore
             cls_dict.pop(key, None)
 
         member_type, enum_type = meta_cls._get_member_and_enum_type(bases)
@@ -537,16 +569,15 @@ class EnumMeta(type):
         _, enum_type = cls._get_member_and_enum_type(bases)
         cls_dict = meta_cls.__prepare__(class_name, bases)
 
-        if isinstance(names, str):
+        if isinstance(names, str):  # parse names if required
             names = list(filter(bool, names.replace(",", " ").split()))
 
         if isinstance(names, (tuple, list)) and names and isinstance(names[0], str):
             original_names, names = names, []
             member_values = []
             for count, name in enumerate(original_names):
-                value = enum_type.enum_generate_next_value(
-                    name, start, count, member_values.copy()
-                )
+                # generate values
+                value = enum_type.enum_generate_next_value(name, start, count, member_values.copy())
                 member_values.append(value)
                 names.append((name, value))
 
@@ -566,10 +597,10 @@ class EnumMeta(type):
         if module is None:
             try:
                 module = _get_frame(2).f_globals.get("__name__")
-            except (AttributeError, ValueError):
+            except (AttributeError, ValueError):  # pragma: no cover
                 pass
 
-        if module is None:
+        if module is None:  # pragma: no cover
             _make_class_unpicklable(enum_class)
 
         else:
@@ -823,7 +854,7 @@ class Enum(metaclass=EnumMeta):
         return f"<{self.__class__.__name__}.{self._name}: {self._value}>"
 
     def __str__(self) -> str:
-        return f"{self.__class__.__name__}.{self._name} ({self.title})"
+        return f"{self.__class__.__name__}.{self._name}"
 
     def __format__(self, format_spec: str) -> str:
         # pure enum
@@ -844,8 +875,7 @@ class Enum(metaclass=EnumMeta):
 
     def __dir__(self) -> List[str]:
         added_behavior = [
-            key for key in OBJECT_DIR(self)
-            if not _is_special(key) and key not in self._member_map
+            key for key in OBJECT_DIR(self) if not _is_special(key) and key not in self._member_map
         ]
         return DEFAULT_DIR_INCLUDE + added_behavior
 
@@ -947,8 +977,8 @@ class Flag(Enum):
 
     def __str__(self) -> str:
         if self._name is None:
-            return f"{self.__class__.__name__}.{self.composite_name} ({self.title})"
-        return f"{self.__class__.__name__}.{self._name} ({self.title})"
+            return f"{self.__class__.__name__}.{self.composite_name}"
+        return f"{self.__class__.__name__}.{self._name}"
 
     @classmethod
     def from_args(cls, *args) -> Enum:
@@ -971,19 +1001,13 @@ class Flag(Enum):
     @dynamic_attribute
     def composite_name(self) -> str:
         """Composite name of the composite Flag."""
-        return "|".join(
-            map(str, (
-                (member._name or member._value) for member in self.decompose()
-            ))
-        )
+        return "|".join(map(str, ((member._name or member._value) for member in self.decompose())))
 
     @dynamic_attribute
     def title(self) -> str:
         """Title of the Flag, which accounts for composites."""
         return ", ".join(
-            map(_make_readable, (
-                (member._name or member._value) for member in self.decompose()
-            ))
+            map(_make_readable, ((member._name or member._value) for member in self.decompose()))
         )
 
     def __bool__(self) -> bool:
@@ -993,7 +1017,7 @@ class Flag(Enum):
         cls = self.__class__
         try:
             other = cls(other)
-        except Exception:  # noqa
+        except Exception:  # noqa  # pragma: no cover
             return NotImplemented
         return cls(self._value | other._value)
 
@@ -1001,7 +1025,7 @@ class Flag(Enum):
         cls = self.__class__
         try:
             other = cls(other)
-        except Exception:  # noqa
+        except Exception:  # noqa  # pragma: no cover
             return NotImplemented
         return cls(self._value & other._value)
 
@@ -1009,7 +1033,7 @@ class Flag(Enum):
         cls = self.__class__
         try:
             other = cls(other)
-        except Exception:  # noqa
+        except Exception:  # noqa  # pragma: no cover
             return NotImplemented
         return cls(self._value ^ other._value)
 
@@ -1028,9 +1052,20 @@ class Flag(Enum):
     __iand__ = __and__
     __ixor__ = __xor__
 
+    __ror__ = __or__
+    __rand__ = __and__
+    __rxor__ = __xor__
+
 
 class IntFlag(int, Flag):
     """Support for integer-based bit flags."""
+
+    @classmethod
+    def enum_missing(cls, value: int) -> Flag:
+        if not isinstance(value, int):
+            raise ValueError(f"{value!r} is not a valid {cls.__name__}.")
+
+        return cls._create_composite_member(value)
 
     @classmethod
     def _create_composite_member(cls, value: int) -> Flag:
@@ -1046,7 +1081,7 @@ class IntFlag(int, Flag):
                 bit = _high_bit(extra_flags)
                 flag_value = 2 ** bit
 
-                if (flag_value not in cls._value_map and flag_value not in need_to_create):
+                if flag_value not in cls._value_map and flag_value not in need_to_create:
                     need_to_create.append(flag_value)
 
                 if extra_flags == -flag_value:
@@ -1067,6 +1102,9 @@ class IntFlag(int, Flag):
 
         return composite_member
 
+    def __invert__(self) -> Flag:
+        return self.__class__(~self._value)
+
 
 def _decompose(flag: Type[Flag], value: int) -> Tuple[List[Flag], int]:
     """Decompose given flag into flag members that value is composed of.
@@ -1074,32 +1112,36 @@ def _decompose(flag: Type[Flag], value: int) -> Tuple[List[Flag], int]:
     value that was not covered by any flag members.
     """
     not_covered = value
-
-    if value < 0:
-        flags_to_check = [  # lists are to avoid race conditions when adding more composite members
-            (member, value) for value, member in list(flag._value_map.items())
-            if member.name is not None
-        ]
-    else:
-        flags_to_check = [  # same here
-            (member, value) for value, member in list(flag._value_map.items())
-            if member.name is not None or _power_of_two(value)
-        ]
+    is_not_negative = value >= 0
 
     members = []
 
-    for member, member_value in flags_to_check:
+    for member in flag:
+        member_value = member._value
         if member_value and member_value & value == member_value:
             members.append(member)
             not_covered &= ~member_value
+
+    if is_not_negative:
+        temporary = not_covered
+
+        while temporary:
+            flag_value = 2 ** _high_bit(temporary)
+
+            if flag_value in flag._value_map:
+                members.append(flag._value_map[flag_value])
+                not_covered &= ~flag_value
+
+            temporary &= ~flag_value
 
     if not members and value in flag._value_map:
         members.append(flag._value_map[value])
 
     members.sort(key=lambda member: member._value, reverse=True)
 
-    if len(members) > 1 and members[0].value == value:
-        members.pop(0)  # don't need the member itself
+    if len(members) > 1 and members[0].value == value:  # pragma: no cover
+        # do not need the value member itself
+        members.pop(0)
 
     return members, not_covered
 
@@ -1107,13 +1149,6 @@ def _decompose(flag: Type[Flag], value: int) -> Tuple[List[Flag], int]:
 def _high_bit(value: int) -> int:
     """Return index of the highest bit, and -1 if value is 0."""
     return value.bit_length() - 1
-
-
-def _power_of_two(value: int) -> bool:
-    """Check if given value is a power of two."""
-    if value < 1:
-        return False
-    return value == 2 ** _high_bit(value)
 
 
 class Trait:
@@ -1130,34 +1165,34 @@ class StrFormat(Trait):
 class Order(Trait):
     """Trait that implements ordering (==, !=, <, >, <= and >=) for enums."""
 
-    def __hash__(self) -> int:  # need to define hash because we are defining equality
+    def __hash__(self) -> int:  # need to redefine because we implement == and !=
         return hash(self._name)
 
     def __eq__(self, other: Union[T, Enum]) -> bool:
         try:
             other = self.__class__(other)
-        except Exception:  # noqa
+        except Exception:  # noqa  # pragma: no cover
             return NotImplemented
         return self._value == other._value
 
     def __ne__(self, other: Union[T, Enum]) -> bool:
         try:
             other = self.__class__(other)
-        except Exception:  # noqa
+        except Exception:  # noqa  # pragma: no cover
             return NotImplemented
         return self._value != other._value
 
     def __lt__(self, other: Union[T, Enum]) -> bool:
         try:
             other = self.__class__(other)
-        except Exception:  # noqa
+        except Exception:  # noqa  # pragma: no cover
             return NotImplemented
         return self._value < other._value
 
     def __gt__(self, other: Union[T, Enum]) -> bool:
         try:
             other = self.__class__(other)
-        except Exception:  # noqa
+        except Exception:  # noqa  # pragma: no cover
             return NotImplemented
         return self._value > other._value
 
@@ -1168,6 +1203,7 @@ class Order(Trait):
         return self > other or self == other
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     import doctest
+
     doctest.testmod()  # test docstring on top of the module

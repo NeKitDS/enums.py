@@ -1,0 +1,24 @@
+language: python
+
+python:
+  - "3.6"
+  - "3.7"
+  - "3.8"
+
+install:
+  # install library + flake8 + pytest
+  - pip install -U .[test]
+  # install coverage
+  - pip install -U coverage.py
+  # install coveralls
+  - pip install -U coveralls
+
+script:
+  # run linter
+  - flake8
+  # run tests and check coverage
+  - coverage run -m pytest test_enums.py
+
+after_success:
+  # report to coveralls
+  - coveralls
