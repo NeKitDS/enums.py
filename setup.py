@@ -30,7 +30,7 @@ setup(
     long_description=readme,
     long_description_content_type="text/x-rst",
     include_package_data=True,
-    extras_require={"test": ["flake8", "pytest"]},
+    extras_require={"test": ["coverage", "flake8", "pytest"]},
     python_requires=">=3.6",
     classifiers=[
         "Development Status :: 4 - Beta",
