@@ -16,7 +16,7 @@ enums.py
     :alt: Required Python Versions
 
 .. image:: https://img.shields.io/pypi/status/enums.py.svg
-    :target: https://github.com/NeKitDS/enums.py/
+    :target: https://github.com/NeKitDS/enums.py
     :alt: Project Development Status
 
 .. image:: https://img.shields.io/pypi/dm/enums.py.svg
@@ -24,7 +24,7 @@ enums.py
     :alt: Library Downloads/Month
 
 .. image:: https://app.codacy.com/project/badge/Grade/5a7b36c3304d40818c5d8b4181fe8564
-    :target: https://app.codacy.com/project/NeKitDS/gd.py/dashboard
+    :target: https://app.codacy.com/project/NeKitDS/enums.py/dashboard
     :alt: Code Quality [Codacy]
 
 .. image:: https://img.shields.io/coveralls/github/NeKitDS/enums.py
