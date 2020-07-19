@@ -24,7 +24,7 @@ setup(
     url="https://github.com/NeKitDS/enums.py",
     project_urls={"Issue tracker": "https://github.com/NeKitDS/enums.py/issues"},
     version=version,
-    py_modules=["enums"],
+    py_modules=["enums", "test_enums"],
     license="MIT",
     description="Enhanced Enum Implementation for Python",
     long_description=readme,

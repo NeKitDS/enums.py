@@ -630,6 +630,25 @@ In order to install the library from source, you can do the following:
     $ cd enums.py
     $ python -m pip install -U .
 
+Testing
+-------
+
+In order to test the library, you need to have *coverage*, *flake8* and *pytest* packages.
+
+They can be installed like so:
+
+.. code:: sh
+
+    $ cd enums.py
+    $ python -m pip install .[test]
+
+Then linting and running tests with coverage:
+
+.. code:: sh
+
+    $ flake8
+    $ coverage run -m pytest test_enums.py
+
 Changlelog
 ----------
 
