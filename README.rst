@@ -16,7 +16,7 @@ enums.py
     :alt: Required Python Versions
 
 .. image:: https://img.shields.io/pypi/status/enums.py.svg
-    :target: https://github.com/NeKitDS/enums.py
+    :target: https://github.com/nekitdev/enums.py
     :alt: Project Development Status
 
 .. image:: https://img.shields.io/pypi/dm/enums.py.svg
@@ -24,11 +24,11 @@ enums.py
     :alt: Library Downloads/Month
 
 .. image:: https://app.codacy.com/project/badge/Grade/5a7b36c3304d40818c5d8b4181fe8564
-    :target: https://app.codacy.com/project/NeKitDS/enums.py/dashboard
+    :target: https://app.codacy.com/project/nekitdev/enums.py/dashboard
     :alt: Code Quality [Codacy]
 
-.. image:: https://img.shields.io/coveralls/github/NeKitDS/enums.py
-    :target: https://coveralls.io/github/NeKitDS/enums.py
+.. image:: https://img.shields.io/coveralls/github/nekitdev/enums.py
+    :target: https://coveralls.io/github/nekitdev/enums.py
     :alt: Code Coverage
 
 .. image:: https://img.shields.io/endpoint.svg?url=https%3A%2F%2Fshieldsio-patreon.herokuapp.com%2Fnekit%2Fpledges
@@ -626,7 +626,7 @@ In order to install the library from source, you can do the following:
 
 .. code:: sh
 
-    $ git clone https://github.com/NeKitDS/enums.py
+    $ git clone https://github.com/nekitdev/enums.py
     $ cd enums.py
     $ python -m pip install -U .
 
@@ -669,4 +669,4 @@ Changlelog
 Authors
 -------
 
-This project is mainly developed by `NeKitDS <https://github.com/NeKitDS>`_.
+This project is mainly developed by `nekitdev <https://github.com/nekitdev>`_.

@@ -19,10 +19,10 @@ readme = (root / "README.rst").read_text("utf-8")
 
 setup(
     name="enums.py",
-    author="NeKitDS",
+    author="nekitdev",
     author_email="gdpy13@gmail.com",
-    url="https://github.com/NeKitDS/enums.py",
-    project_urls={"Issue tracker": "https://github.com/NeKitDS/enums.py/issues"},
+    url="https://github.com/nekitdev/enums.py",
+    project_urls={"Issue tracker": "https://github.com/nekitdev/enums.py/issues"},
     version=version,
     py_modules=["enums", "test_enums"],
     license="MIT",
