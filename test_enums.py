@@ -126,8 +126,8 @@ class TestHelpers:
         for name in self.TO_LOWER_NAME:
             assert enums._lower_name(name) == self.LOWER_NAME
 
-    CHAR = "_"  # char to use in ends_or_starts_with()
-    NAME = "nekit"  # name to test with ends_or_starts_with()
+    CHAR = "_"  # char to use in starts_and_ends_with()
+    NAME = "nekit"  # name to test with starts_and_ends_with()
     EMPTY_CHAR = ""  # too short? haha
     LONG_CHAR = "__"  # too long
 
@@ -225,7 +225,7 @@ class TestHelpers:
 
     def test_make_readable(self) -> None:
         for key, value in self.OBJECT_TO_READABLE.items():
-            assert enums._make_readable(key, if_none="undefined") == value
+            assert enums._make_readable(key) == value
 
 
 class TestEnumCreate:

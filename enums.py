@@ -1,6 +1,6 @@
 # -*- encoding: utf-8 -*-
 
-# type: ignore  # sorry, too magical
+# type: ignore  # way too magical to be understood by type checkers
 
 """Enhanced Enum Implementation for Python.
 
@@ -58,7 +58,7 @@ __title__ = "enums"
 __author__ = "nekitdev"
 __copyright__ = "Copyright 2020 nekitdev"
 __license__ = "MIT"
-__version__ = "0.2.1"
+__version__ = "0.3.0"
 
 import sys
 from types import DynamicClassAttribute as dynamic_attribute, FrameType, MappingProxyType
@@ -78,7 +78,7 @@ from typing import (
 )
 
 try:
-    from typing import NoReturn  # this may error on earlier version
+    from typing import NoReturn  # this may error on earlier versions
 
 except ImportError:  # pragma: no cover
     NoReturn = None
@@ -107,7 +107,8 @@ OBJECT_NEW = object.__new__  # default new function used to create enum values
 USELESS_NEW = {None, None.__new__, object.__new__}  # Enum's new is added here when it is defined
 
 E = TypeVar("E", bound="Enum")  # used for enum typing
-T, U = TypeVar("T"), TypeVar("U")  # used for general typing
+T = TypeVar("T")  # used for general typing
+U = TypeVar("U")  # used for general typing
 
 Enum: Type[E] = None  # we define Enum here as None, because it is used in EnumMeta before creation
 
@@ -119,10 +120,10 @@ class Singleton:
         return str(self.__class__.__name__)
 
     @classmethod
-    def __new__(cls, *args, **kwargs) -> T:
+    def __new__(cls, *args, **kwargs) -> "Singleton":
         if cls.instance is None:
             cls.instance = super().__new__(cls)
-            cls.instance.__init__(*args, **kwargs)
+
         return cls.instance
 
 
@@ -163,12 +164,46 @@ def _is_special(string: str) -> bool:
     return string.startswith(("_", "enum_"))
 
 
+class _GetFrame(Exception):
+    pass
+
+
 def _get_frame(level: int = 0) -> Optional[FrameType]:
-    return sys._getframe(level)
+    try:
+        return sys._getframe(level)
+
+    except AttributeError:
+        try:
+            raise _GetFrame()
+
+        except _GetFrame as error:
+            traceback = error.__traceback__
+
+            if traceback is None:
+                raise ValueError("No traceback to get the frame from.")
+
+            current_frame = traceback.tb_frame
+
+            if current_frame is None:
+                raise ValueError("Can not get current frame.")
+
+            frame = current_frame.f_back
+
+            if frame is None:
+                raise ValueError("Can not get caller frame.")
+
+            if level:
+                for _ in range(level):
+                    frame = frame.f_back
+
+                    if frame is None:
+                        raise ValueError("Call stack is not deep enough.") from None
+
+            return frame
 
 
 def _is_strict_dunder(string: str) -> bool:
-    return _starts_and_ends_with(string, "_", times=2)
+    return _starts_and_ends_with(string, "_", times=2, strict=True)
 
 
 def _is_descriptor(some_object: Any) -> bool:
@@ -201,9 +236,9 @@ def _make_class_unpicklable(cls: Type[T]) -> None:
     cls.__module__ = "<unknown>"
 
 
-def _make_readable(entity: T, if_none: U = "undefined") -> str:
+def _make_readable(entity: T, on_undefined: U = "undefined") -> str:
     if entity is None:
-        entity = if_none
+        entity = on_undefined
 
     name = str(entity)
 
@@ -480,15 +515,27 @@ class EnumMeta(type):
         # add default documentation if we need to
         cls_dict.setdefault("__doc__", DEFAULT_DOCUMENTATION)
 
-        base_list = list(bases)  # convert tuple to list in order to do manipulations
+        # create dummy enum class to manipulate MRO
+        dummy_enum_class = super().__new__(meta_cls, cls, bases, EnumDict())
 
-        try:  # try to remove member type from the list
-            base_list.remove(member_type)
-            base_list.append(member_type)  # and add it and the end
-        except ValueError:  # not in base_list
+        mro = list(dummy_enum_class.mro())
+
+        try:
+            mro.remove(dummy_enum_class)
+
+        except ValueError:
             pass
 
-        bases = tuple(base_list)  # now back to tuple
+        try:
+            if mro.index(member_type) < mro.index(enum_type):
+                # we need to preserve enum_type functions
+                mro.remove(enum_type)
+                mro.insert(mro.index(member_type), enum_type)
+
+        except ValueError:
+            pass
+
+        bases = tuple(mro)  # now back to tuple
 
         # create our new class
         enum_class = super().__new__(meta_cls, cls, bases, cls_dict)
@@ -575,6 +622,7 @@ class EnumMeta(type):
         if isinstance(names, (tuple, list)) and names and isinstance(names[0], str):
             original_names, names = names, []
             member_values = []
+
             for count, name in enumerate(original_names):
                 # generate values
                 value = enum_type.enum_generate_next_value(name, start, count, member_values.copy())
@@ -597,6 +645,7 @@ class EnumMeta(type):
         if module is None:
             try:
                 module = _get_frame(2).f_globals.get("__name__")
+
             except (AttributeError, ValueError):  # pragma: no cover
                 pass
 
@@ -627,6 +676,7 @@ class EnumMeta(type):
     def __delattr__(cls, name: str) -> None:
         if name in cls._member_map:
             raise AttributeError(f"Can not delete Enum member: {name!r}.")
+
         super().__delattr__(name)
 
     def __getattr__(cls, name: str) -> E:
@@ -635,6 +685,7 @@ class EnumMeta(type):
 
         try:
             return cls._member_map[name]
+
         except KeyError:
             raise AttributeError(name) from None
 
@@ -782,9 +833,11 @@ class EnumMeta(type):
 
         try:
             return cls(value)
+
         except Exception:  # noqa
             if default is null:
                 raise
+
             return cls.from_value(default)
 
     def as_dict(cls) -> Dict[str, T]:
@@ -895,11 +948,11 @@ class Enum(metaclass=EnumMeta):
         return self._value
 
 
+USELESS_NEW.add(Enum.__new__)
+
+
 class IntEnum(int, Enum):
     """Generic enumeration for integer-based values."""
-
-
-USELESS_NEW.add(Enum.__new__)
 
 
 def unique(enumeration: Type[Enum]) -> Type[Enum]:
@@ -968,16 +1021,19 @@ class Flag(Enum):
                     other_name=type(other).__qualname__, self_name=self.__class__.__qualname__
                 )
             )
+
         return other._value & self._value == other._value
 
     def __repr__(self) -> str:
         if self._name is None:
             return f"<{self.__class__.__name__}.{self.composite_name}: {self._value}>"
+
         return f"<{self.__class__.__name__}.{self._name}: {self._value}>"
 
     def __str__(self) -> str:
         if self._name is None:
             return f"{self.__class__.__name__}.{self.composite_name}"
+
         return f"{self.__class__.__name__}.{self._name}"
 
     @classmethod
@@ -1015,26 +1071,35 @@ class Flag(Enum):
 
     def __or__(self, other: Union[T, Enum]) -> Enum:
         cls = self.__class__
+
         try:
             other = cls(other)
+
         except Exception:  # noqa  # pragma: no cover
             return NotImplemented
+
         return cls(self._value | other._value)
 
     def __and__(self, other: Union[T, Enum]) -> Enum:
         cls = self.__class__
+
         try:
             other = cls(other)
+
         except Exception:  # noqa  # pragma: no cover
             return NotImplemented
+
         return cls(self._value & other._value)
 
     def __xor__(self, other: Union[T, Enum]) -> Enum:
         cls = self.__class__
+
         try:
             other = cls(other)
+
         except Exception:  # noqa  # pragma: no cover
             return NotImplemented
+
         return cls(self._value ^ other._value)
 
     def __invert__(self) -> Enum:

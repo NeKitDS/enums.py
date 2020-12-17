@@ -329,10 +329,20 @@ For example:
 
 .. code-block:: python3
 
-    class FloatEnum(StrFormat, float, Enum):
-        ...
+    class Value(Order, Enum):
+        """Generic value that supports ordering."""
 
-If ``data_type`` is given, it is moved to the end of bases, so example above will turn into ``(StrFormat, Enum, float)``.
+    class FloatValue(float, Value):
+        """Float value that inherits Value."""
+
+Here, ``FloatValue`` bases are going to be transformed into:
+
+.. code-block:: python3
+
+    Value, float, Order, Enum
+
+Which allows us to preserve functions defined in enums or flags,
+while still having *mixins* work nicely with overriding them.
 
 Traits
 ------
