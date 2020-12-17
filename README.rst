@@ -676,6 +676,8 @@ Changlelog
 
 - **0.2.0** - Fix IntEnum to be almost even with standard library, fix bugs and add tests.
 
+- **0.3.0** - Fix MRO resolution and add small enhancements.
+
 Authors
 -------
 

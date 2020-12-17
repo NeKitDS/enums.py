@@ -591,8 +591,9 @@ class EnumMeta(type):
         """With value argument only, search member by value.
         Otherwise, functional API: create new enum class.
         """
-        if not members and not names:
+        if not members and not names and not type:
             return cls.__new__(cls, value)
+
         return cls.create(
             value, names, module=module, qualname=qualname, type=type, start=start, **members
         )
@@ -610,7 +611,8 @@ class EnumMeta(type):
     ) -> Type[E]:
         """Convenient implementation of creating a new enum."""
         meta_cls = cls.__class__
-        bases = (cls,) if type is None else (cls, type)
+
+        bases = (cls,) if type is None else (type, cls)
 
         _, enum_type = cls._get_member_and_enum_type(bases)
         cls_dict = meta_cls.__prepare__(class_name, bases)
