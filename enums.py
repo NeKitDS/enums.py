@@ -164,15 +164,14 @@ def _is_special(string: str) -> bool:
     return string.startswith(("_", "enum_"))
 
 
-class _GetFrame(Exception):
-    pass
+try:
+    _get_frame = sys._getframe
 
+except AttributeError:  # pragma: no cover
+    class _GetFrame(Exception):
+        pass
 
-def _get_frame(level: int = 0) -> Optional[FrameType]:
-    try:
-        return sys._getframe(level)
-
-    except AttributeError:
+    def _get_frame(level: int = 0) -> Optional[FrameType]:
         try:
             raise _GetFrame()
 
@@ -523,7 +522,7 @@ class EnumMeta(type):
         try:
             mro.remove(dummy_enum_class)
 
-        except ValueError:
+        except ValueError:  # pragma: no cover
             pass
 
         try:
@@ -532,7 +531,7 @@ class EnumMeta(type):
                 mro.remove(enum_type)
                 mro.insert(mro.index(member_type), enum_type)
 
-        except ValueError:
+        except ValueError:  # pragma: no cover
             pass
 
         bases = tuple(mro)  # now back to tuple
