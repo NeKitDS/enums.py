@@ -188,7 +188,7 @@ Enum members have several useful attributes:
 Advanced Name/Value to Enum
 ---------------------------
 
-Enums can be created from case insensetive strings:
+Enums can be created from case insensitive strings:
 
 .. code-block:: python3
 
@@ -197,7 +197,7 @@ Enums can be created from case insensetive strings:
 
     test = Test.from_name("weird_test")
 
-**Note that if two members have same case insensetive name version, last in wins!**
+**Note that if two members have same case insensitive name version, last in wins!**
 
 **Also keep in mind** ``Enum.from_name`` **will not work with composite flags!**
 
@@ -482,19 +482,19 @@ Special Names
 
 ``enums.py`` uses special names for managing behavior:
 
-- *enum_missing: classmethod function(cls: Type[Enum], value: T) -> Enum*
+- **enum_missing** - ``classmethod(cls: Type[Enum], value: T) -> Enum``
 
-- *enum_ignore: Union[str, Iterable[str]]*
+- **enum_ignore** - ``Union[str, Iterable[str]]``
 
-- *enum_generate_next_value: function(name: str, start: Optional[T], count: int, member_values: List[T]) -> T*
+- **enum_generate_next_value** - ``staticmethod(name: str, start: Optional[T], count: int, member_values: List[T]) -> T``
 
-- *enum_auto_on_missing: bool*
+- **enum_auto_on_missing** - ``bool``
 
-- *enum_start: T*
+- **enum_start** - ``T``
 
-- *_name: str*
+- **_name** - ``str``
 
-- *_value: T*
+- **_value** - ``T``
 
 enum_missing
 ~~~~~~~~~~~~
@@ -677,6 +677,8 @@ Changlelog
 - **0.2.0** - Fix IntEnum to be almost even with standard library, fix bugs and add tests.
 
 - **0.3.0** - Fix MRO resolution and add small enhancements.
+
+- **0.3.1** - Fix small typos and other non-code-related things.
 
 Authors
 -------

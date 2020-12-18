@@ -58,7 +58,7 @@ __title__ = "enums"
 __author__ = "nekitdev"
 __copyright__ = "Copyright 2020 nekitdev"
 __license__ = "MIT"
-__version__ = "0.3.0"
+__version__ = "0.3.1"
 
 import sys
 from types import DynamicClassAttribute as dynamic_attribute, FrameType, MappingProxyType
@@ -817,11 +817,11 @@ class EnumMeta(type):
 
     @property
     def lower_names(cls) -> Dict[str, E]:
-        """Create mapping of lower_name -> member for CI (case insensetive) comparison/lookup."""
+        """Create mapping of lower_name -> member for CI (case insensitive) comparison/lookup."""
         return {_lower_name(name): member for name, member in cls.members.items()}
 
     def from_name(cls, name: str) -> None:
-        """CI (case insensetive) member by name lookup."""
+        """CI (case insensitive) member by name lookup."""
         return cls.lower_names[_lower_name(name)]
 
     def from_value(cls, value: T, default: U = null) -> E:
