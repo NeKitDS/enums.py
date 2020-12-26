@@ -777,8 +777,10 @@ class TestMutation:
 
 class TestOrder:
     def test_order(self) -> None:
-        assert Sign.PLUS >= Sign.ZERO >= Sign.MINUS
-        assert Sign.MINUS <= Sign.ZERO <= Sign.PLUS
+        assert Sign.PLUS >= Sign.ZERO
+        assert Sign.ZERO > Sign.MINUS
+        assert Sign.MINUS < Sign.ZERO
+        assert Sign.ZERO <= Sign.PLUS
 
         assert Sign.MINUS != Sign.PLUS
         assert Sign.ZERO == 0

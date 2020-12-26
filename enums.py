@@ -58,7 +58,7 @@ __title__ = "enums"
 __author__ = "nekitdev"
 __copyright__ = "Copyright 2020 nekitdev"
 __license__ = "MIT"
-__version__ = "0.3.1"
+__version__ = "0.4.0"
 
 import sys
 from types import DynamicClassAttribute as dynamic_attribute, FrameType, MappingProxyType
@@ -78,10 +78,10 @@ from typing import (
 )
 
 try:
-    from typing import NoReturn  # this may error on earlier versions
+    from typing import NoReturn  # type: ignore  # this may error on earlier versions
 
 except ImportError:  # pragma: no cover
-    NoReturn = None
+    NoReturn = None  # type: ignore
 
 __all__ = (
     "EnumMeta",
@@ -110,7 +110,7 @@ E = TypeVar("E", bound="Enum")  # used for enum typing
 T = TypeVar("T")  # used for general typing
 U = TypeVar("U")  # used for general typing
 
-Enum: Type[E] = None  # we define Enum here as None, because it is used in EnumMeta before creation
+ENUM_DEFINED = False  # flag that is going to be set after Enum class will be created
 
 
 class Singleton:
@@ -171,7 +171,7 @@ except AttributeError:  # pragma: no cover
     class _GetFrame(Exception):
         pass
 
-    def _get_frame(level: int = 0) -> Optional[FrameType]:
+    def _get_frame(level: int = 0) -> FrameType:
         try:
             raise _GetFrame()
 
@@ -213,7 +213,7 @@ def _is_descriptor(some_object: Any) -> bool:
     return False
 
 
-def _find_data_type(bases: Tuple[Type[T], ...]) -> Type[T]:
+def _find_data_type(bases: Tuple[Type[Any], ...]) -> Type[T]:
     for chain in bases:
         for base in chain.__mro__:
             if base is object:  # not useful in our case
@@ -222,6 +222,7 @@ def _find_data_type(bases: Tuple[Type[T], ...]) -> Type[T]:
             elif "__new__" in base.__dict__:
                 if issubclass(base, Enum):  # not looking for enums
                     continue
+
                 return base
 
     return object  # nothing found, so return object class
@@ -231,11 +232,11 @@ def _make_class_unpicklable(cls: Type[T]) -> None:
     def _break_on_reduce_attempt(instance: T, protocol: int) -> NoReturn:
         raise TypeError(f"{instance} can not be pickled.")
 
-    cls.__reduce_ex__ = _break_on_reduce_attempt
+    cls.__reduce_ex__ = _break_on_reduce_attempt  # type: ignore
     cls.__module__ = "<unknown>"
 
 
-def _make_readable(entity: T, on_undefined: U = "undefined") -> str:
+def _make_readable(entity: Optional[T], on_undefined: str = "undefined") -> str:
     if entity is None:
         entity = on_undefined
 
@@ -250,9 +251,9 @@ def _make_readable(entity: T, on_undefined: U = "undefined") -> str:
 def _create_enum_member(
     member_name: Optional[str],
     member_type: Type[T],
-    value: U,
+    member_value: Union[U, Tuple[U, ...]],
     enum_class: Type[E],
-    new_function: Callable[..., T],
+    new_function: Callable[..., E],
     use_args: bool,
     dynamic_attributes: Iterable[str],
 ) -> E:
@@ -267,10 +268,11 @@ def _create_enum_member(
                 f"{member_name!r} already defined as: {enum_class._member_map[member_name]!r}."
             )
 
-    if not isinstance(value, tuple):  # wrap in tuple if not already one
-        args = (value,)
+    if not isinstance(member_value, tuple):  # wrap in tuple if not already one
+        args = (member_value,)
+
     else:  # do nothing otherwise
-        args = value
+        args = member_value
 
     if member_type is tuple:  # special case for tuple enums
         args = (args,)  # wrap args again another time
@@ -280,17 +282,17 @@ def _create_enum_member(
 
         if not hasattr(enum_member, "_value"):  # if value was not defined already
             if member_type is not object:
-                value = member_type(*args)
+                member_value = member_type(*args)
 
-            enum_member._value = value
+            enum_member._value = member_value
 
     else:
         enum_member = new_function(enum_class)
 
         if not hasattr(enum_member, "_value"):  # if value was not defined previously
-            enum_member._value = value
+            enum_member._value = member_value
 
-    enum_class._member_values.append(value)
+    enum_class._member_values.append(member_value)
 
     enum_member._name = member_name
     enum_member.__objclass__ = enum_class
@@ -315,7 +317,7 @@ def _create_enum_member(
 
     try:
         # see if member with this value exists (we reach here with member_name=None)
-        previous_member = enum_class._value_map.get(value)
+        previous_member = enum_class._value_map.get(member_value)
 
         # see if member exists and has name set to None
         if previous_member is not None and previous_member._name is None:
@@ -324,7 +326,7 @@ def _create_enum_member(
 
         # attempt to add value to value -> member map in order to make lookups constant, O(1)
         # if value is not hashable, this will fail and our lookups will be linear, O(n)
-        enum_class._value_map.setdefault(value, enum_member)  # in order to support threading
+        enum_class._value_map.setdefault(member_value, enum_member)  # in order to support threading
 
     except TypeError:  # not hashable
         pass
@@ -356,7 +358,8 @@ def incremental_next_value(name: str, start: Optional[T], count: int, member_val
 
     for member_value in reversed(member_values):  # find value we can increment
         try:
-            return member_value + 1
+            return member_value + 1  # type: ignore
+
         except TypeError:  # unsupported operand type(s) for +: T, int  # pragma: no cover
             pass
 
@@ -375,7 +378,8 @@ def strict_bit_next_value(name: str, start: Optional[T], count: int, member_valu
 
     for member_value in reversed(member_values):
         try:
-            high_bit = _high_bit(member_value)
+            high_bit = _high_bit(member_value)  # type: ignore
+
         except Exception:  # noqa
             raise ValueError(f"Invalid flag value: {member_value!r}.") from None
 
@@ -396,15 +400,18 @@ class EnumDict(Dict[str, U]):
         self._member_values: List[T] = []
         self._ignore: List[str] = []
 
-    def __setitem__(self, key: str, value: T) -> None:
+    def __setitem__(self, key: str, value: U) -> None:
         if key == "enum_auto_on_missing":
-            self._auto_on_missing = value
+            self._auto_on_missing = bool(value)
 
         elif key == "enum_ignore":
             if isinstance(value, str):  # process enum_ignore if given a string
-                value = filter(bool, value.replace(",", " ").split())
+                ignore = filter(bool, value.replace(",", " ").split())
 
-            self._ignore = list(value)
+            else:
+                ignore = value
+
+            self._ignore = list(ignore)
 
         elif key == "enum_generate_next_value":  # setting enum_generate_next_value() function
             self._enum_generate_next_value = value
@@ -431,9 +438,11 @@ class EnumDict(Dict[str, U]):
                             "Attempt to use auto value while "
                             "enum_generate_next_value was not defined."
                         )
+
                     value.value = self._enum_generate_next_value(
                         key, self._start, len(self._member_names), self._member_values.copy()
                     )
+
                 value = value.value
 
             self._member_names.append(key)
@@ -453,7 +462,7 @@ class EnumMeta(type):
     def __prepare__(
         meta_cls,
         cls: str,
-        bases: Tuple[Type[T], ...],
+        bases: Tuple[Type[Any], ...],
         *,
         auto_on_missing: bool = False,
         ignore: Optional[Union[str, Iterable[str]]] = None,
@@ -478,7 +487,7 @@ class EnumMeta(type):
     def __new__(
         meta_cls,
         cls: str,
-        bases: Tuple[Type[T], ...],
+        bases: Tuple[Type[Any], ...],
         cls_dict: EnumDict,
         *,
         # these are used by our meta_cls.__prepare__(...)
@@ -487,6 +496,8 @@ class EnumMeta(type):
         start: Optional[U] = None,
     ) -> Type[E]:
         """Initialize new class. This function is *very* magical."""
+        global ENUM_DEFINED  # alright, magical things here
+
         # add enum_ignore to self
         enum_ignore = list(cls_dict.get("enum_ignore", []))
         enum_ignore.append("enum_ignore")
@@ -564,17 +575,20 @@ class EnumMeta(type):
             _create_enum_member(
                 member_name=member_name,
                 member_type=member_type,
-                value=enum_members[member_name],
+                member_value=enum_members[member_name],
                 enum_class=enum_class,
                 new_function=new_func,
                 use_args=new_use_args,
                 dynamic_attributes=dynamic_attributes,
             )
 
-        if Enum is not None:  # if enum was created (this will be false on initial run)
+        if ENUM_DEFINED:  # if enum was created (this will be false on initial run)
             if new_member_save:  # save as new_member if needed
                 enum_class.__new_member__ = new_func
             enum_class.__new__ = Enum.__new__
+
+        else:
+            ENUM_DEFINED = True
 
         return enum_class  # finally! ;)
 
@@ -627,7 +641,9 @@ class EnumMeta(type):
             for count, name in enumerate(original_names):
                 # generate values
                 value = enum_type.enum_generate_next_value(name, start, count, member_values.copy())
+
                 member_values.append(value)
+
                 names.append((name, value))
 
         for item in names:  # either mapping or (name, value) pair
@@ -725,14 +741,17 @@ class EnumMeta(type):
         return DEFAULT_DIR_INCLUDE + added_behavior
 
     @staticmethod
-    def _get_member_and_enum_type(bases: Tuple[Type[T], ...]) -> Tuple[Type[T], Type[E]]:
+    def _get_member_and_enum_type(bases: Tuple[Type[Any], ...]) -> Tuple[Type[T], Type[E]]:
         """Find data type and first enum type that are subclassed."""
-        if not bases:  # no bases => nothing to search => return defaults
-            return object, Enum
+        if not bases:  # no bases => nothing to search => return defaultsd
+            if ENUM_DEFINED:  # pragma: no cover
+                return object, Enum
+
+            return object, object
 
         enum_type = bases[-1]
 
-        if Enum and not issubclass(enum_type, Enum):
+        if ENUM_DEFINED and not issubclass(enum_type, Enum):
             raise TypeError(f"New enumerations should be created as {ENUM_DEFINITION}.")
 
         if enum_type._member_map:
@@ -785,7 +804,7 @@ class EnumMeta(type):
         return _create_enum_member(
             member_name=name,
             member_type=cls._member_type,
-            value=value,
+            member_value=value,
             enum_class=cls,
             new_function=cls._new_function,
             use_args=cls._use_args,
@@ -1006,7 +1025,7 @@ class Flag(Enum):
             composite_member = _create_enum_member(
                 member_name=None,
                 member_type=cls._member_type,
-                value=value,
+                member_value=value,
                 enum_class=cls,
                 new_function=cls._new_function,
                 use_args=cls._use_args,
@@ -1159,7 +1178,7 @@ class IntFlag(int, Flag):
                 composite_member = _create_enum_member(
                     member_name=None,
                     member_type=cls._member_type,
-                    value=value,
+                    member_value=value,
                     enum_class=cls,
                     new_function=cls._new_function,
                     use_args=cls._use_args,
@@ -1234,39 +1253,59 @@ class Order(Trait):
     def __hash__(self) -> int:  # need to redefine because we implement == and !=
         return hash(self._name)
 
-    def __eq__(self, other: Union[T, Enum]) -> bool:
+    def __eq__(self, other: Any) -> bool:
         try:
             other = self.__class__(other)
+
         except Exception:  # noqa  # pragma: no cover
             return NotImplemented
+
         return self._value == other._value
 
-    def __ne__(self, other: Union[T, Enum]) -> bool:
+    def __ne__(self, other: Any) -> bool:
         try:
             other = self.__class__(other)
+
         except Exception:  # noqa  # pragma: no cover
             return NotImplemented
+
         return self._value != other._value
 
-    def __lt__(self, other: Union[T, Enum]) -> bool:
+    def __lt__(self, other: Any) -> bool:
         try:
             other = self.__class__(other)
+
         except Exception:  # noqa  # pragma: no cover
             return NotImplemented
+
         return self._value < other._value
 
-    def __gt__(self, other: Union[T, Enum]) -> bool:
+    def __gt__(self, other: Any) -> bool:
         try:
             other = self.__class__(other)
+
         except Exception:  # noqa  # pragma: no cover
             return NotImplemented
+
         return self._value > other._value
 
-    def __le__(self, other: Union[T, Enum]) -> bool:
-        return self < other or self == other
+    def __le__(self, other: Any) -> bool:
+        try:
+            other = self.__class__(other)
 
-    def __ge__(self, other: Union[T, Enum]) -> bool:
-        return self > other or self == other
+        except Exception:  # noqa  # pragma: no cover
+            return NotImplemented
+
+        return self._value <= other._value
+
+    def __ge__(self, other: Any) -> bool:
+        try:
+            other = self.__class__(other)
+
+        except Exception:  # noqa  # pragma: no cover
+            return NotImplemented
+
+        return self._value >= other._value
 
 
 if __name__ == "__main__":  # pragma: no cover

@@ -680,6 +680,8 @@ Changlelog
 
 - **0.3.1** - Fix small typos and other non-code-related things.
 
+- **0.4.0** - Typing fixes and usage of ``ENUM_DEFINED`` flag instead of ``Enum = None`` and checks.
+
 Authors
 -------
 
