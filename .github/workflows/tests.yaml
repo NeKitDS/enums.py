@@ -21,7 +21,7 @@ jobs:
     - name: Install Dependencies
       run: |
         # install pip and setuptools, which are required to build
-        python -m pip install --upgrade pip setuptools
+        python -m pip install --upgrade pip setuptools wheel
         # install enums.py with all required dependencies
         python -m pip install --upgrade .[test]
         # install coveralls for reporting coverage

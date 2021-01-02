@@ -58,7 +58,7 @@ __title__ = "enums"
 __author__ = "nekitdev"
 __copyright__ = "Copyright 2020 nekitdev"
 __license__ = "MIT"
-__version__ = "0.4.0"
+__version__ = "0.5.0"
 
 import sys
 from types import DynamicClassAttribute as dynamic_attribute, FrameType, MappingProxyType
@@ -861,8 +861,8 @@ class EnumMeta(type):
             return cls.from_value(default)
 
     def as_dict(cls) -> Dict[str, T]:
-        """Return lower_name -> member_value mapping overall all members."""
-        return {name.lower(): member.value for name, member in cls.members.items()}
+        """Return casefold_name -> member_value mapping overall all members."""
+        return {name.casefold(): member.value for name, member in cls.members.items()}
 
 
 class Enum(metaclass=EnumMeta):

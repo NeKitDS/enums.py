@@ -433,9 +433,9 @@ Class Keyword Arguments
 
 Enum class knows 3 class keyword arguments:
 
-- *auto_on_missing: bool*;
-- *ignore: Union[str, Iterable[str]]*;
-- *start: T*.
+- **auto_on_missing** - ``bool``
+- **ignore** - ``Union[str, Iterable[str]]``
+- **start** - ``T``
 
 auto_on_missing
 ~~~~~~~~~~~~~~~
