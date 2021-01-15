@@ -231,7 +231,7 @@ def _find_data_type(bases: Tuple[Type[Any], ...]) -> Type[T]:
 
 
 def _make_class_unpicklable(cls: Type[T]) -> None:
-    def _break_on_reduce_attempt(instance: T, protocol: int) -> NoReturn:
+    def _break_on_reduce_attempt(instance: T, protocol: int) -> NoReturn:  # pragma: no cover
         raise TypeError(f"{instance} can not be pickled.")
 
     cls.__reduce_ex__ = _break_on_reduce_attempt  # type: ignore
@@ -239,7 +239,7 @@ def _make_class_unpicklable(cls: Type[T]) -> None:
 
 
 def _make_class_dict_unpicklable(cls_dict: Dict[str, Any]) -> None:
-    def _break_on_reduce_attempt(instance: T, protocol: int) -> NoReturn:
+    def _break_on_reduce_attempt(instance: T, protocol: int) -> NoReturn:  # pragma: no cover
         raise TypeError(f"{instance} can not be pickled.")
 
     cls_dict.update(__reduce_ex__=_break_on_reduce_attempt, __module__="<unknown>")
