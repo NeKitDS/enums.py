@@ -682,6 +682,8 @@ Changlelog
 
 - **0.4.0** - Typing fixes and usage of ``ENUM_DEFINED`` flag instead of ``Enum = None`` and checks.
 
+- **0.5.0** - Preserve important methods, such as ``__format__``, ``__repr__``, ``__str__`` and others.
+
 Authors
 -------
 

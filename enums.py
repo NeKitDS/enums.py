@@ -101,6 +101,8 @@ DEFAULT_DOCUMENTATION = "An enumeration."
 DEFAULT_DIR_INCLUDE = ["__class__", "__doc__", "__module__", "__members__"]  # some dir() dunders
 DESCRIPTOR_ATTRIBUTES = ("__get__", "__set__", "__delete__")  # attributes that define a descriptor
 ENUM_DEFINITION = "EnumName([mixin_type, ...] [data_type] enum_type)"  # enum subclass definition
+ENUM_PRESERVE = ("__format__", "__repr__", "__str__", "__reduce_ex__")
+PICKLE_METHODS = ("__getnewargs_ex__", "__getnewargs__", "__reduce_ex__", "__reduce__")
 INVALID_ENUM_NAMES = {"mro", ""}  # any others?
 OBJECT_DIR = object.__dir__  # function to use for fetching dirs
 OBJECT_NEW = object.__new__  # default new function used to create enum values
@@ -234,6 +236,13 @@ def _make_class_unpicklable(cls: Type[T]) -> None:
 
     cls.__reduce_ex__ = _break_on_reduce_attempt  # type: ignore
     cls.__module__ = "<unknown>"
+
+
+def _make_class_dict_unpicklable(cls_dict: Dict[str, Any]) -> None:
+    def _break_on_reduce_attempt(instance: T, protocol: int) -> NoReturn:
+        raise TypeError(f"{instance} can not be pickled.")
+
+    cls_dict.update(__reduce_ex__=_break_on_reduce_attempt, __module__="<unknown>")
 
 
 def _make_readable(entity: Optional[T], on_undefined: str = "undefined") -> str:
@@ -525,6 +534,13 @@ class EnumMeta(type):
         # add default documentation if we need to
         cls_dict.setdefault("__doc__", DEFAULT_DOCUMENTATION)
 
+        if "__reduce_ex__" not in cls_dict:
+            if member_type is not object:
+                member_type_dict = member_type.__dict__
+
+                if not any(method_name in member_type_dict for method_name in PICKLE_METHODS):
+                    _make_class_dict_unpicklable(cls_dict)
+
         # create dummy enum class to manipulate MRO
         dummy_enum_class = super().__new__(meta_cls, cls, bases, EnumDict())
 
@@ -549,6 +565,17 @@ class EnumMeta(type):
 
         # create our new class
         enum_class = super().__new__(meta_cls, cls, bases, cls_dict)
+
+        for name in ENUM_PRESERVE:  # on top of it, preserve names that should ideally belong to us
+            if name in cls_dict:
+                continue
+
+            class_method = getattr(enum_class, name)
+            type_method = getattr(member_type, name, None)
+            enum_method = getattr(enum_type, name, None)
+
+            if type_method is not None and type_method is class_method:
+                setattr(enum_class, name, enum_method)
 
         # add member names list and member type, along with new_func and new_use_args
         enum_class._member_names: List[str] = []  # list of member names
